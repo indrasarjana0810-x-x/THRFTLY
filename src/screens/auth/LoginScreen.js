@@ -1,6 +1,8 @@
-// src/screens/auth/LoginScreen.js
-
-import React, { useState, useRef } from "react";
+/* ==========================================
+   Login Screen Component
+========================================== */
+/* ---------- Imports ---------- */
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,19 +13,69 @@ import {
   Platform,
   ScrollView,
   useColorScheme,
+  KeyboardAvoidingView,
+  Keyboard,
+  Animated,
 } from "react-native";
-import Colors from "../../constants/Colors";
+import Colors from "../../constants/colors";
 import ThriftlyLogo from "../../components/ThriftlyLogo";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomText from "../../components/CustomText";
 import Panel from "../../components/Panel";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
+import api from "../../services/api";
+import { useToast } from "../../components/Toast";
 
-export default function LoginScreen({ onLogin }) {
+/**
+ * LoginScreen
+ * Halaman autentikasi utama aplikasi.
+ * Menangani login mahasiswa menggunakan NIM dan Kata Sandi.
+ */
+export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateToForgotPassword }) {
+  /* ---------- Component States & Refs ---------- */
+  const { showToast } = useToast();
   const [nim, setNim] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
   const passwordRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  const shiftAnim = useRef(new Animated.Value(0)).current;
+
+  /* ---------- Lifecycle & Animations ---------- */
+  useEffect(() => {
+    // Menggeser panel saat keyboard muncul
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => {
+        Animated.spring(shiftAnim, {
+          toValue: -40,
+          useNativeDriver: true,
+          speed: 14,
+          bounciness: 2,
+        }).start();
+      }
+    );
+
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        Animated.spring(shiftAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 14,
+          bounciness: 2,
+        }).start();
+      }
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [shiftAnim]);
 
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -31,13 +83,50 @@ export default function LoginScreen({ onLogin }) {
 
   const styles = getStyles(theme, isDark);
 
-  const handleLogin = () => {
-    console.log("Login attempt with NIM/Email:", nim, "Password:", password);
-    if (onLogin) {
-      onLogin();
+  /* ---------- Authentication Logic ---------- */
+  const handleLogin = async () => {
+    // Validasi Form
+    setErrors({});
+    let localErrors = {};
+
+    if (!nim.trim()) {
+      localErrors.nim = "NIM atau Email wajib diisi";
+    }
+    if (!password) {
+      localErrors.password = "Kata sandi wajib diisi";
+    }
+
+    if (Object.keys(localErrors).length > 0) {
+      setErrors(localErrors);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const data = await api.auth.login(nim.trim(), password);
+
+      if (data.status === "SUCCESS") {
+        showToast("Login Berhasil!", "success");
+        if (onLogin) {
+          onLogin(data.data);
+        }
+      } else {
+        showToast(data.message || "Gagal masuk. NIM/Email atau sandi salah.", "danger");
+      }
+    } catch (err) {
+      console.log(err);
+      let errMsg = "Gagal terhubung ke server Spring Boot Anda.";
+      if (err.response && err.response.data) {
+        errMsg = err.response.data.message || err.response.data.error || errMsg;
+      }
+      showToast(errMsg, "danger");
+    } finally {
+      setLoading(false);
     }
   };
 
+  /* ---------- Render ---------- */
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
@@ -51,95 +140,118 @@ export default function LoginScreen({ onLogin }) {
         <View style={[styles.orb, styles.orbBottomLeft]} />
       </View>
 
-      {/* HAPUS KeyboardAvoidingView */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="always"
-        scrollEnabled={true}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
       >
-        {/* Logo Area */}
-        <View style={styles.logoWrapper}>
-          <View style={styles.logoCircle} />
-          <View style={styles.logoCover} />
-          <View style={styles.logoSvgContainer}>
-            <ThriftlyLogo size={88} darkMode={isDark} />
-          </View>
-        </View>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { justifyContent: "center" },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          scrollEnabled={true}
+        >
+          <Animated.View style={{ transform: [{ translateY: shiftAnim }], width: "100%" }}>
+            <Panel style={styles.formContainer}>
+              <View style={styles.logoWrapper}>
+                <View style={styles.logoCircle} />
+                <View style={styles.logoSvgContainer}>
+                  <ThriftlyLogo size={88} darkMode={isDark} />
+                </View>
+              </View>
 
-        <Panel style={styles.formContainer}>
-          <CustomText type="h1" style={styles.brandText}>
-            <Text style={{ color: Colors.primary.blue500 }}>THRIFT</Text>
-            <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
-          </CustomText>
+              <CustomText type="h1" style={styles.brandText}>
+                <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+                <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
+              </CustomText>
 
-          <CustomInput
-            label="NIM atau Email AstraTech"
-            placeholder="NIM / Email AstraTech"
-            value={nim}
-            onChangeText={setNim}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => {
-              setTimeout(() => {
-                passwordRef.current?.focus();
-              }, 100);
-            }}
-            icon={
-              <Feather name="user" size={16} color={theme.text.secondary} />
-            }
-          />
+              <CustomInput
+                label="NIM atau Email AstraTech"
+                placeholder="NIM / Email AstraTech"
+                value={nim}
+                onChangeText={(text) => {
+                  setNim(text);
+                  if (errors.nim) setErrors((prev) => ({ ...prev, nim: null }));
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => {
+                  setTimeout(() => {
+                    passwordRef.current?.focus();
+                  }, 100);
+                }}
+                error={errors.nim}
+                icon={
+                  <MaterialIcons name="person" size={16} color={theme.text.secondary} />
+                }
+              />
 
-          <CustomInput
-            ref={passwordRef}
-            label="Kata Sandi"
-            placeholder="Masukkan kata sandi"
-            value={password}
-            onChangeText={setPassword}
-            isPassword={true}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="done"
-            blurOnSubmit={true}
-            onSubmitEditing={handleLogin}
-            icon={
-              <Feather name="lock" size={16} color={theme.text.secondary} />
-            }
-          />
+              <CustomInput
+                ref={passwordRef}
+                label="Kata Sandi"
+                placeholder="Masukkan kata sandi"
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
+                }}
+                isPassword={true}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                blurOnSubmit={true}
+                onSubmitEditing={() => Keyboard.dismiss()}
+                error={errors.password}
+                icon={
+                  <MaterialIcons name="lock" size={16} color={theme.text.secondary} />
+                }
+              />
 
-          <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.7}>
-            <Text style={styles.forgotText}>Lupa Kata Sandi?</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.forgotBtn}
+                activeOpacity={0.7}
+                onPress={onNavigateToForgotPassword}
+              >
+                <Text style={styles.forgotText}>Lupa Kata Sandi?</Text>
+              </TouchableOpacity>
 
-          <CustomButton
-            title="Masuk"
-            onPress={handleLogin}
-            type="primary"
-            style={styles.submitBtn}
-          />
+              <CustomButton
+                title="Masuk"
+                onPress={handleLogin}
+                type="primary"
+                loading={loading}
+                style={styles.submitBtn}
+              />
 
-          <View style={styles.dividerWrapper}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>atau</Text>
-            <View style={styles.dividerLine} />
-          </View>
+              <View style={styles.dividerWrapper}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>atau</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-          <View style={styles.registerWrapper}>
-            <Text style={styles.registerLabel}>Belum punya akun?</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={styles.registerLink}>Daftar Sekarang</Text>
-            </TouchableOpacity>
-          </View>
-        </Panel>
-      </ScrollView>
+              <View style={styles.registerWrapper}>
+                <Text style={styles.registerLabel}>Belum punya akun?</Text>
+                <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToRegister}>
+                  <Text style={styles.registerLink}>Daftar Sekarang</Text>
+                </TouchableOpacity>
+              </View>
+            </Panel>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-/* Styles */
+/* ---------- Styles ---------- */
 const getStyles = (theme, isDark) => {
   return StyleSheet.create({
     safeArea: {
@@ -148,10 +260,10 @@ const getStyles = (theme, isDark) => {
     },
     scrollContent: {
       flexGrow: 1,
-      justifyContent: "center",
       paddingHorizontal: 24,
       paddingVertical: 32,
-      paddingBottom: Platform.OS === "ios" ? 120 : 80, // <-- TAMBAH PADDING BAWAH
+      paddingTop: 100,
+      paddingBottom: Platform.OS === "ios" ? 100 : 80,
     },
     orbsContainer: {
       ...StyleSheet.absoluteFillObject,
@@ -188,41 +300,34 @@ const getStyles = (theme, isDark) => {
       left: -40,
     },
     logoWrapper: {
-      width: 110,
-      height: 110,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: -55,
-      zIndex: 20,
-      position: "relative",
+      position: "absolute",
+      top: -55, // Setengah dari tinggi logo wrapper  //
       alignSelf: "center",
+      width: 110,
+      height: 55, // Setengah lingkaran  //
+      zIndex: 20,
     },
     logoCircle: {
       position: "absolute",
       width: 110,
-      height: 110,
-      borderRadius: 55,
+      height: 55, // Setengah lingkaran  //
+      borderTopLeftRadius: 55,
+      borderTopRightRadius: 55,
       backgroundColor: theme.surface,
       borderWidth: 1.5,
+      borderBottomWidth: 0,
       borderColor: theme.border,
       zIndex: 10,
     },
-    logoCover: {
-      position: "absolute",
-      bottom: -1.5,
-      width: 112,
-      height: 55,
-      backgroundColor: theme.surface,
-      zIndex: 12,
-      alignSelf: "center",
-    },
     logoSvgContainer: {
       position: "absolute",
-      zIndex: 15,
+      top: 11, // Tengahkan logo ukuran 88 terhadap tinggi lingkaran 110  //
       width: 88,
       height: 88,
+      alignSelf: "center",
       alignItems: "center",
       justifyContent: "center",
+      zIndex: 15,
     },
     brandText: {
       fontFamily: "Barlow-Black",
@@ -236,6 +341,8 @@ const getStyles = (theme, isDark) => {
       paddingTop: 65,
       zIndex: 10,
       marginHorizontal: 4,
+      width: "100%",
+      position: "relative", // Diperlukan untuk penempatan absolute logoWrapper  //
     },
     forgotBtn: {
       alignSelf: "flex-end",
@@ -257,36 +364,36 @@ const getStyles = (theme, isDark) => {
     dividerWrapper: {
       flexDirection: "row",
       alignItems: "center",
-      marginVertical: 18,
+      marginVertical: 20,
+      width: "100%",
     },
     dividerLine: {
       flex: 1,
       height: 1,
       backgroundColor: theme.border,
-      opacity: 0.6,
     },
     dividerText: {
       fontFamily: "Barlow-Medium",
-      fontSize: 12,
-      color: theme.text.placeholder,
-      paddingHorizontal: 12,
+      fontSize: 13,
+      color: theme.text.secondary,
+      paddingHorizontal: 16,
     },
     registerWrapper: {
       flexDirection: "row",
-      alignItems: "center",
       justifyContent: "center",
-      gap: 6,
+      alignItems: "center",
+      gap: 4,
+      width: "100%",
     },
     registerLabel: {
-      fontFamily: "Barlow-Regular",
-      fontSize: 13,
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
       color: theme.text.secondary,
     },
     registerLink: {
       fontFamily: "Barlow-Bold",
-      fontSize: 13,
+      fontSize: 14,
       color: Colors.primary.blue500,
-      textDecorationLine: "underline",
     },
   });
 };

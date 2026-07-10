@@ -1,0 +1,909 @@
+/* ==========================================
+   Register Screen Component
+========================================== */
+/* ---------- Imports ---------- */
+import React, { useState, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  ScrollView,
+  useColorScheme,
+  Modal,
+  KeyboardAvoidingView,
+  Animated,
+  Keyboard,
+} from "react-native";
+import Colors from "../../constants/colors";
+import ThriftlyLogo from "../../components/ThriftlyLogo";
+import CustomInput from "../../components/CustomInput";
+import CustomButton from "../../components/CustomButton";
+import CustomText from "../../components/CustomText";
+import Panel from "../../components/Panel";
+import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
+import api from "../../services/api";
+import { useToast } from "../../components/Toast";
+
+const STUDY_PROGRAMS = [
+  "Teknologi Rekayasa Pemeliharaan Alat Berat",
+  "Teknologi Rekayasa Logistik",
+  "Teknologi Rekayasa Perangkat Lunak",
+  "Pembuatan Peralatan dan Perkakas Produksi",
+  "Teknik Produksi dan Proses Manufaktur",
+  "Teknologi Konstruksi Bangunan Gedung",
+  "Mesin Otomotif",
+  "Mekatronika",
+  "Manajemen Informatika",
+];
+
+const UNIQUE_STUDY_PROGRAMS = [...new Set(STUDY_PROGRAMS)];
+
+/**
+ * RegisterScreen
+ * Halaman pendaftaran mahasiswa baru.
+ * Dilengkapi dengan validasi multi-step (Akun & Profil).
+ */
+export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }) {
+  /* ---------- Component States & Refs ---------- */
+  const { showToast } = useToast();
+  const [step, setStep] = useState(1);
+
+  const [idUser, setIdUser] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [name, setName] = useState("");
+  const [studyProgram, setStudyProgram] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const step1X = useRef(new Animated.Value(0)).current;
+  const step2X = useRef(new Animated.Value(500)).current;
+  const checkPop1 = useRef(new Animated.Value(1)).current;
+  const shiftAnim = useRef(new Animated.Value(0)).current;
+
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const phoneRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  /* ---------- Lifecycle & Animations ---------- */
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => {
+        Animated.spring(shiftAnim, {
+          toValue: -40,
+          useNativeDriver: true,
+          speed: 14,
+          bounciness: 2,
+        }).start();
+      }
+    );
+
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        Animated.spring(shiftAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 14,
+          bounciness: 2,
+        }).start();
+      }
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [shiftAnim]);
+
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+
+  const styles = getStyles(theme, isDark);
+
+  useEffect(() => {
+    if (step === 1) {
+      Animated.parallel([
+        Animated.spring(step1X, {
+          toValue: 0,
+          tension: 50,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+        Animated.spring(step2X, {
+          toValue: 500,
+          tension: 50,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      checkPop1.setValue(1);
+    } else {
+      Animated.parallel([
+        Animated.spring(step1X, {
+          toValue: -500,
+          tension: 50,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+        Animated.spring(step2X, {
+          toValue: 0,
+          tension: 50,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      checkPop1.setValue(0.3);
+      Animated.spring(checkPop1, {
+        toValue: 1,
+        tension: 100,
+        friction: 6,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [step]);
+
+  /* ---------- Authentication Logic ---------- */
+  const handleNextStep1 = () => {
+    setErrors({});
+    let localErrors = {};
+
+    if (!idUser.trim()) {
+      localErrors.idUser = "NIM wajib diisi";
+    } else if (idUser.trim().length > 15) {
+      localErrors.idUser = "NIM maksimal 15 karakter";
+    }
+
+    const jsEmailRegex = /^[a-zA-Z0-9]+@polytechnic\.astra\.ac\.id$/;
+    if (!email.trim()) {
+      localErrors.email = "Email AstraTech wajib diisi";
+    } else if (!jsEmailRegex.test(email.trim())) {
+      localErrors.email = "Format email harus [NIM]@polytechnic.astra.ac.id";
+    } else if (email.length > 100) {
+      localErrors.email = "Email maksimal 100 karakter";
+    }
+
+    if (!password) {
+      localErrors.password = "Kata sandi wajib diisi";
+    } else if (password.length < 8) {
+      localErrors.password = "Kata sandi minimal 8 karakter";
+    }
+
+    if (Object.keys(localErrors).length > 0) {
+      setErrors(localErrors);
+      return;
+    }
+
+    setStep(2);
+  };
+
+  const handleRegister = async () => {
+    setErrors({});
+    let localErrors = {};
+
+    if (!name.trim()) {
+      localErrors.name = "Nama lengkap wajib diisi";
+    } else if (name.length > 100) {
+      localErrors.name = "Nama maksimal 100 karakter";
+    }
+
+    if (!studyProgram) {
+      localErrors.studyProgram = "Program studi wajib diisi";
+    }
+
+    if (!phone.trim()) {
+      localErrors.phone = "Nomor telepon wajib diisi";
+    } else if (phone.length > 15) {
+      localErrors.phone = "Nomor telepon maksimal 15 karakter";
+    }
+
+    if (Object.keys(localErrors).length > 0) {
+      setErrors(localErrors);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const data = await api.auth.register({
+        idUser: idUser.trim(),
+        name: name.trim(),
+        email: email.trim(),
+        studyProgram,
+        password,
+        phone: phone.trim(),
+      });
+
+      if (data.status === "SUCCESS") {
+        showToast("Pendaftaran Berhasil! Silakan masuk.", "success");
+        if (onRegisterSuccess) {
+          onRegisterSuccess();
+        }
+      } else {
+        showToast(data.message || "Gagal melakukan registrasi", "danger");
+      }
+    } catch (err) {
+      console.log(err);
+      let errMsg = "Gagal terhubung ke server Spring Boot Anda.";
+      if (err.response && err.response.data) {
+        errMsg = err.response.data.message || err.response.data.error || errMsg;
+      }
+      showToast(errMsg, "danger");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPrograms = UNIQUE_STUDY_PROGRAMS.filter((program) =>
+    program.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  /* ---------- Render ---------- */
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={theme.background}
+      />
+
+      <View style={styles.orbsContainer} pointerEvents="none">
+        <View style={[styles.orb, styles.orbTopLeft]} />
+        <View style={[styles.orb, styles.orbMiddleRight]} />
+        <View style={[styles.orb, styles.orbBottomLeft]} />
+      </View>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { justifyContent: "center" },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          scrollEnabled={true}
+        >
+          <Animated.View style={{ transform: [{ translateY: shiftAnim }], width: "100%" }}>
+            <Panel style={styles.formContainer}>
+              <View style={styles.logoWrapper}>
+                <View style={styles.logoCircle} />
+                <View style={styles.logoSvgContainer}>
+                  <ThriftlyLogo size={88} darkMode={isDark} />
+                </View>
+              </View>
+
+              <CustomText type="h1" style={styles.brandText}>
+                <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+                <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
+              </CustomText>
+
+              <View style={styles.stepperContainer}>
+                <View style={styles.stepConnectorLineBg}>
+                  <View style={[styles.stepConnectorLineFill, { width: step > 1 ? "100%" : "0%" }]} />
+                </View>
+
+                <View style={styles.stepNodeContainer}>
+                  {step > 1 && <View style={styles.glowRing} />}
+                  <View
+                    style={[
+                      styles.stepNodeCircle,
+                      step === 1 ? styles.activeNode : (step > 1 ? styles.completedNode : styles.inactiveNode)
+                    ]}
+                  >
+                    {step > 1 ? (
+                      <Animated.View style={{ transform: [{ scale: checkPop1 }] }}>
+                        <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                      </Animated.View>
+                    ) : (
+                      <Text style={[styles.stepNodeText, step === 1 ? styles.activeNodeText : styles.inactiveNodeText]}>
+                        1
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.stepLabel, step === 1 ? styles.activeLabel : (step > 1 ? styles.completedLabel : styles.inactiveLabel)]}>
+                    Akun
+                  </Text>
+                </View>
+
+                <View style={styles.stepNodeContainer}>
+                  <View
+                    style={[
+                      styles.stepNodeCircle,
+                      step === 2 ? styles.activeNode : styles.inactiveNode
+                    ]}
+                  >
+                    <Text style={[styles.stepNodeText, step === 2 ? styles.activeNodeText : styles.inactiveNodeText]}>
+                      2
+                    </Text>
+                  </View>
+                  <Text style={[styles.stepLabel, step === 2 ? styles.activeLabel : styles.inactiveLabel]}>
+                    Profil
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ overflow: "hidden", minHeight: 330, width: "100%" }}>
+                <Animated.View style={{ transform: [{ translateX: step1X }], width: "100%" }}>
+                  <CustomInput
+                    label="NIM"
+                    placeholder="Masukkan NIM Anda"
+                    value={idUser}
+                    onChangeText={(text) => {
+                      setIdUser(text);
+                      if (errors.idUser) setErrors((prev) => ({ ...prev, idUser: null }));
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => emailRef.current?.focus()}
+                    error={errors.idUser}
+                    icon={<FontAwesome name="tag" size={16} color={theme.text.secondary} />}
+                  />
+
+                  <CustomInput
+                    ref={emailRef}
+                    label="Email AstraTech"
+                    placeholder="contoh: nim@polytechnic.astra.ac.id"
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    error={errors.email}
+                    icon={<MaterialIcons name="email" size={16} color={theme.text.secondary} />}
+                  />
+
+                  <CustomInput
+                    ref={passwordRef}
+                    label="Kata Sandi"
+                    placeholder="Minimal 8 karakter"
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
+                    }}
+                    isPassword={true}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    error={errors.password}
+                    icon={<MaterialIcons name="lock" size={16} color={theme.text.secondary} />}
+                  />
+
+                  <CustomButton
+                    title="Lanjut"
+                    onPress={handleNextStep1}
+                    type="primary"
+                    style={styles.submitBtn}
+                  />
+                </Animated.View>
+
+                <Animated.View style={{ transform: [{ translateX: step2X }], position: "absolute", top: 0, width: "100%" }}>
+                  <CustomInput
+                    label="Nama Lengkap"
+                    placeholder="Masukkan nama lengkap Anda"
+                    value={name}
+                    onChangeText={(text) => {
+                      setName(text);
+                      if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
+                    }}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    returnKeyType="next"
+                    blurOnSubmit={true}
+                    error={errors.name}
+                    icon={<MaterialIcons name="person" size={16} color={theme.text.secondary} />}
+                  />
+
+                  <View style={styles.selectContainer}>
+                    <Text style={[styles.selectLabel, { color: theme.text.secondary }]}>
+                      Program Studi
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setModalVisible(true)}
+                      style={[
+                        styles.selectWrapper,
+                        {
+                          backgroundColor: isDark ? Colors.dark.background : "#F9FAFB",
+                          borderColor: errors.studyProgram ? Colors.semantic.error.main : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.selectText,
+                          { color: studyProgram ? theme.text.primary : theme.text.placeholder },
+                        ]}
+                      >
+                        {studyProgram || "Pilih Program Studi"}
+                      </Text>
+                      <MaterialIcons name="expand-more" size={18} color={theme.text.secondary} />
+                    </TouchableOpacity>
+                    {errors.studyProgram && (
+                      <Text style={styles.errorText}>{errors.studyProgram}</Text>
+                    )}
+                  </View>
+
+                  <CustomInput
+                    ref={phoneRef}
+                    label="Nomor Telepon"
+                    placeholder="Masukkan nomor telepon aktif"
+                    value={phone}
+                    onChangeText={(text) => {
+                      setPhone(text);
+                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: null }));
+                    }}
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    error={errors.phone}
+                    icon={<MaterialIcons name="phone" size={16} color={theme.text.secondary} />}
+                  />
+
+                  <View style={styles.step2Buttons}>
+                    <CustomButton
+                      title="Kembali"
+                      onPress={() => setStep(1)}
+                      type="secondary"
+                      style={styles.backBtn}
+                    />
+                    <CustomButton
+                      title="Daftar Sekarang"
+                      onPress={handleRegister}
+                      type="primary"
+                      loading={loading}
+                      style={styles.registerBtn}
+                    />
+                  </View>
+                </Animated.View>
+              </View>
+
+              <View style={styles.dividerWrapper}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>atau</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.loginWrapper}>
+                <Text style={styles.loginLabel}>Sudah punya akun?</Text>
+                <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToLogin}>
+                  <Text style={styles.loginLink}>Masuk Sekarang</Text>
+                </TouchableOpacity>
+              </View>
+            </Panel>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: theme.text.heading }]}>
+              Pilih Program Studi
+            </Text>
+
+            <CustomInput
+              placeholder="Cari program studi..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              icon={<MaterialIcons name="search" size={16} color={theme.text.secondary} />}
+              style={{ marginBottom: 12 }}
+            />
+
+            <ScrollView style={styles.modalScroll}>
+              {filteredPrograms.length > 0 ? (
+                filteredPrograms.map((program) => (
+                  <TouchableOpacity
+                    key={program}
+                    activeOpacity={0.7}
+                    style={[styles.modalOption, { borderBottomColor: theme.border }]}
+                    onPress={() => {
+                      setStudyProgram(program);
+                      setModalVisible(false);
+                      setSearchQuery("");
+                      if (errors.studyProgram) {
+                        setErrors((prev) => ({ ...prev, studyProgram: null }));
+                      }
+                    }}
+                  >
+                    <Text style={[styles.optionText, { color: theme.text.primary }]}>
+                      {program}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
+                    Program studi tidak ditemukan
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setModalVisible(false);
+                setSearchQuery("");
+              }}
+              style={styles.cancelBtn}
+            >
+              <Text style={styles.cancelBtnText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+/* ---------- Styles ---------- */
+const getStyles = (theme, isDark) => {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingVertical: 32,
+      paddingTop: 100,
+      paddingBottom: Platform.OS === "ios" ? 100 : 80,
+    },
+    orbsContainer: {
+      ...StyleSheet.absoluteFillObject,
+      overflow: "hidden",
+      zIndex: 0,
+    },
+    orb: {
+      position: "absolute",
+      borderRadius: 150,
+      opacity: isDark ? 0.08 : 0.06,
+    },
+    orbTopLeft: {
+      width: 320,
+      height: 320,
+      borderRadius: 160,
+      backgroundColor: Colors.primary.blue500,
+      top: -60,
+      left: -90,
+    },
+    orbMiddleRight: {
+      width: 260,
+      height: 260,
+      borderRadius: 130,
+      backgroundColor: Colors.primary.yellow500,
+      top: "32%",
+      right: -80,
+    },
+    orbBottomLeft: {
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+      backgroundColor: "#A855F7",
+      bottom: -60,
+      left: -40,
+    },
+    logoWrapper: {
+      position: "absolute",
+      top: -55, // Setengah dari tinggi logo wrapper  //
+      alignSelf: "center",
+      width: 110,
+      height: 55, // Setengah lingkaran  //
+      zIndex: 20,
+    },
+    logoCircle: {
+      position: "absolute",
+      width: 110,
+      height: 55, // Setengah lingkaran  //
+      borderTopLeftRadius: 55,
+      borderTopRightRadius: 55,
+      backgroundColor: theme.surface,
+      borderWidth: 1.5,
+      borderBottomWidth: 0,
+      borderColor: theme.border,
+      zIndex: 10,
+    },
+    logoSvgContainer: {
+      position: "absolute",
+      top: 11, // Tengahkan logo ukuran 88 terhadap tinggi lingkaran 110  //
+      width: 88,
+      height: 88,
+      alignSelf: "center",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 15,
+    },
+    brandText: {
+      fontFamily: "Barlow-Black",
+      fontSize: 28,
+      letterSpacing: -1,
+      textAlign: "center",
+      marginTop: -15,
+      marginBottom: 20,
+    },
+    formContainer: {
+      paddingTop: 65,
+      zIndex: 10,
+      marginHorizontal: 4,
+      width: "100%",
+      position: "relative", // Diperlukan untuk penempatan absolute logoWrapper  //
+    },
+    stepperContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      position: "relative",
+      width: "100%",
+      paddingHorizontal: 40,
+      marginBottom: 24,
+    },
+    stepConnectorLineBg: {
+      position: "absolute",
+      left: 85,
+      right: 85,
+      top: 15,
+      height: 2,
+      backgroundColor: theme.border,
+      borderRadius: 2,
+      zIndex: 1,
+    },
+    stepConnectorLineFill: {
+      height: "100%",
+      backgroundColor: Colors.primary.blue500,
+      borderRadius: 2,
+    },
+    stepNodeContainer: {
+      alignItems: "center",
+      zIndex: 2,
+      position: "relative",
+    },
+    glowRing: {
+      position: "absolute",
+      top: -6, // Menempatkan lingkaran 44px di tengah-tengah bulatan 32px
+      left: "50%",
+      marginLeft: -22, // Setengah dari lebar (44 / 2) untuk centering sempurna
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: Colors.semantic.success.main,
+      opacity: 0.15,
+    },
+    stepNodeCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 2,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.surface,
+    },
+    activeNode: {
+      borderColor: Colors.primary.blue500,
+      backgroundColor: Colors.primary.blue500,
+    },
+    completedNode: {
+      borderColor: Colors.semantic.success.main,
+      backgroundColor: Colors.semantic.success.main,
+      shadowColor: Colors.semantic.success.main,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
+      shadowRadius: 5,
+      elevation: 4,
+    },
+    inactiveNode: {
+      borderColor: theme.border,
+      backgroundColor: theme.surface,
+    },
+    stepNodeText: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 13,
+      color: theme.text.placeholder,
+    },
+    activeNodeText: {
+      color: "#FFFFFF",
+    },
+    inactiveNodeText: {
+      color: theme.text.placeholder,
+    },
+    stepLabel: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 11,
+      marginTop: 6,
+      color: theme.text.placeholder,
+    },
+    activeLabel: {
+      color: Colors.primary.blue500,
+    },
+    completedLabel: {
+      color: Colors.semantic.success.main,
+    },
+    inactiveLabel: {
+      color: theme.text.placeholder,
+    },
+    selectContainer: {
+      marginBottom: 16,
+      width: "100%",
+    },
+    selectLabel: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 12,
+      marginBottom: 6,
+    },
+    selectWrapper: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderRadius: 12,
+      borderWidth: 1.5,
+      paddingHorizontal: 14,
+      height: 48,
+    },
+    selectText: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
+      flex: 1,
+      marginRight: 10,
+    },
+    errorText: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 11,
+      color: Colors.semantic.error.main,
+      marginTop: 4,
+      marginLeft: 4,
+    },
+    submitBtn: {
+      marginTop: 12,
+      width: "100%",
+    },
+    step2Buttons: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 12,
+      width: "100%",
+    },
+    backBtn: {
+      flex: 1,
+    },
+    registerBtn: {
+      flex: 2,
+    },
+    dividerWrapper: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginVertical: 20,
+      width: "100%",
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.border,
+    },
+    dividerText: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 13,
+      color: theme.text.secondary,
+      paddingHorizontal: 16,
+    },
+    loginWrapper: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 4,
+      width: "100%",
+      marginTop: 4,
+    },
+    loginLabel: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
+      color: theme.text.secondary,
+    },
+    loginLink: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 14,
+      color: Colors.primary.blue500,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    modalContent: {
+      borderRadius: 24,
+      borderWidth: 1.5,
+      width: "100%",
+      maxHeight: "80%",
+      padding: 24,
+      overflow: "hidden",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.25,
+      shadowRadius: 15,
+      elevation: 10,
+    },
+    modalTitle: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 18,
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    modalScroll: {
+      marginBottom: 16,
+      maxHeight: 280,
+    },
+    modalOption: {
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      justifyContent: "center",
+    },
+    optionText: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
+    },
+    emptyContainer: {
+      paddingVertical: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    emptyText: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
+    },
+    cancelBtn: {
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: Colors.semantic.error.main,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cancelBtnText: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 15,
+      color: "#FFFFFF",
+    },
+  });
+};

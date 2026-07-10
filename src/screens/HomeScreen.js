@@ -1,7 +1,6 @@
-// src/screens/HomeScreenNew.js
-// Thriftly — Home Screen (Production-Ready Auto Light & Dark Mode)
+// src/screens/HomeScreen.js
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,53 +9,184 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  TextInput,
   Platform,
-  useColorScheme, // Hook bawaan React Native untuk mendeteksi tema sistem HP
-} from "react-native";
-import Colors from "../constants/Colors";
+  useColorScheme,
+  FlatList,
+  Dimensions,
+  Animated,
+} from 'react-native';
+import Colors from '../constants/colors';
+import ProductCard from '../components/ProductCard';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
-// ─── Main Screen ───────────────────────────────────────────────────────────────
+/* =====================================================================
+   DUMMY DATA (Khusus Mahasiswa)
+===================================================================== */
 
-export default function HomeScreen() {
-  const [activeCategory, setActiveCategory] = useState("0");
-  const [activeTab, setActiveTab] = useState("home");
+const QUICK_MENUS = [
+  { id: '1', label: 'Terdekat', icon: 'map-marker-radius', color: Colors.semantic.success.main, bgLight: 'rgba(34, 197, 94, 0.08)', bgDark: 'rgba(34, 197, 94, 0.12)' },
+  { id: '2', label: 'Bisa COD', icon: 'handshake-outline', color: Colors.primary.blue500, bgLight: 'rgba(56, 182, 255, 0.08)', bgDark: 'rgba(56, 182, 255, 0.12)' },
+  { id: '3', label: 'Cuci Gudang', icon: 'package-variant', color: Colors.primary.yellow500, bgLight: 'rgba(255, 214, 0, 0.12)', bgDark: 'rgba(255, 214, 0, 0.15)' },
+  { id: '4', label: 'Lulusan', icon: 'school-outline', color: Colors.semantic.error.main, bgLight: 'rgba(239, 68, 68, 0.08)', bgDark: 'rgba(239, 68, 68, 0.12)' },
+];
 
-  // ── DETEKSI TEMA SISTEM (Sama seperti OLX, Tokopedia, Instagram, dll.) ──
-  const colorScheme = useColorScheme(); // Menghasilkan 'light' atau 'dark'
-  const isDark = colorScheme === "dark";
+const HERO_BANNERS = [
+  {
+    id: 'h1',
+    tagline: 'KAMPUS HIGHLIGHT',
+    title: 'Cuci Gudang Anak Kos Lulus!',
+    desc: 'Kipas, Lemari, dan Setup Skripsi Murah',
+    buttonText: 'Sikat Bos! ≫',
+    emoji: '📦',
+  },
+  {
+    id: 'h2',
+    tagline: 'SEMESTER BARU',
+    title: 'Cari Diktat Kuliah Murah',
+    desc: 'Buku Kalkulus, Fisika, dan Jurnal Bekas',
+    buttonText: 'Cari Buku ≫',
+    emoji: '📚',
+  },
+  {
+    id: 'h3',
+    tagline: 'TIPS THRIFTLY',
+    title: 'Bisa Nego via WhatsApp',
+    desc: 'Langsung chat penjual buat deal harga',
+    buttonText: 'Coba Nego ≫',
+    emoji: '💬',
+  },
+];
+
+const INFINITE_BANNERS = Array(100).fill(HERO_BANNERS).flat().map((item, index) => ({
+  ...item,
+  infiniteId: String(index),
+}));
+
+const LATEST_ITEMS = [
+  {
+    id: '1',
+    title: 'Buku Kalkulus Purcell Ed. 9',
+    price: 'Rp 150.000',
+    condition: 'Baik',
+    location: '1.5km',
+    status: 'Available',
+    imageEmoji: '📚',
+    imageHeight: 180,
+  },
+  {
+    id: '2',
+    title: 'Kemeja Flanel Uniqlo Size L',
+    price: 'Rp 80.000',
+    condition: 'Seperti Baru',
+    location: '800m',
+    status: 'Available',
+    imageEmoji: '👔',
+    imageHeight: 130,
+  },
+  {
+    id: '3',
+    title: 'Monitor PC LG 19 inch (Buat Skripsi)',
+    price: 'Rp 400.000',
+    condition: 'Baik',
+    location: 'COD Area Kos',
+    status: 'Available',
+    imageEmoji: '🖥️',
+    imageHeight: 160,
+  },
+  {
+    id: '4',
+    title: 'Mouse Wireless Logitech M170',
+    price: 'Rp 65.000',
+    condition: 'Sangat Baik',
+    location: '2.1km',
+    status: 'Booked',
+    imageEmoji: '🖱️',
+    imageHeight: 200,
+  },
+];
+
+/* =====================================================================
+   MAIN SCREEN COMPONENT
+===================================================================== */
+
+export default function HomeScreen({ onLogout }) {
+  const [favorites, setFavorites] = useState([]);
+
+  const flatListRef = useRef(null);
+  const currentIndexRef = useRef(HERO_BANNERS.length * 50); // Mulai di tengah array (index 150)
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // NOTE: Mengembalikan index ke posisi tengah jika mencapai akhir array
+      if (currentIndexRef.current >= INFINITE_BANNERS.length - 1) {
+        currentIndexRef.current = HERO_BANNERS.length * 50;
+        if (flatListRef.current) {
+          flatListRef.current.scrollToIndex({ index: currentIndexRef.current, animated: false });
+        }
+      }
+
+      // Melanjutkan pergeseran animasi carousel
+      setTimeout(() => {
+        currentIndexRef.current += 1;
+        if (flatListRef.current) {
+          flatListRef.current.scrollToIndex({ index: currentIndexRef.current, animated: true });
+        }
+      }, 50);
+
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Deteksi tema otomatis dari sistem HP
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
 
-  // Membuat style secara dinamis berdasarkan tema yang sedang aktif
+  // Buat style dinamis berdasarkan tema
   const styles = getStyles(theme, isDark);
 
-  const NAV_TABS = [
-    { id: "home", icon: "⊞", label: "Beranda" },
-    { id: "explore", icon: "◎", label: "Jelajahi" },
-    { id: "sell", icon: "+", label: "", isCenter: true },
-    { id: "wishlist", icon: "♡", label: "Wishlist" },
-    { id: "profile", icon: "○", label: "Profil" },
-  ];
+  const toggleFavorite = (id) => {
+    if (favorites.includes(id)) {
+      setFavorites(favorites.filter((favId) => favId !== id));
+    } else {
+      setFavorites([...favorites, id]);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
-        barStyle={isDark ? "light-content" : "dark-content"}
+        barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
 
-      {/* ── Header ── */}
+      {/* 1. Header (Clean Mode: No Search Bar) */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.logo}>Thriftly</Text>
-          <View style={styles.logoDot} />
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>
+            <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+            <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
+          </Text>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIconBtn}>
-            <Text style={styles.headerIcon}>🔔</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.iconButton}>
+            <MaterialIcons
+              name="notifications-none"
+              size={24}
+              color={isDark ? '#FFFFFF' : Colors.primary.blue500}
+            />
+            {/* Red dot notification indicator */}
+            <View style={styles.notificationDot} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>R</Text>
+          <TouchableOpacity style={styles.iconButton}>
+            <MaterialCommunityIcons
+              name="cart-outline"
+              size={24}
+              color={isDark ? '#FFFFFF' : Colors.primary.blue500}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -66,613 +196,350 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Search Bar ── */}
-        <View style={styles.searchBarWrapper}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Cari barang bekas..."
-            placeholderTextColor={theme.text.placeholder}
-            editable={false}
-          />
-        </View>
+        {/* 2. Hero Banner Carousel */}
+        <View style={styles.heroCardContainer}>
+          <View style={styles.heroCardBg}>
+            <Animated.FlatList
+              ref={flatListRef}
+              data={INFINITE_BANNERS}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.infiniteId}
+              initialScrollIndex={HERO_BANNERS.length * 50}
+              getItemLayout={(data, index) => ({
+                length: Dimensions.get('window').width - 48,
+                offset: (Dimensions.get('window').width - 48) * index,
+                index,
+              })}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                { useNativeDriver: false }
+              )}
+              scrollEventThrottle={16}
+              onScrollToIndexFailed={(info) => {
+                // WARNING: Menangani error out of range jika engine lambat merender index
+                const wait = new Promise(resolve => setTimeout(resolve, 500));
+                wait.then(() => {
+                  if (flatListRef.current && info.index >= 0 && info.index < INFINITE_BANNERS.length) {
+                    flatListRef.current.scrollToIndex({ index: info.index, animated: true });
+                  }
+                });
+              }}
+              onMomentumScrollEnd={(e) => {
+                const newIndex = Math.round(
+                  e.nativeEvent.contentOffset.x / (Dimensions.get('window').width - 48)
+                );
+                currentIndexRef.current = newIndex;
+              }}
+              renderItem={({ item }) => (
+                <View style={styles.heroSlide}>
+                  <View style={styles.heroLeft}>
+                    <Text style={styles.heroTagline}>{item.tagline}</Text>
+                    <Text style={styles.heroTitle}>{item.title}</Text>
+                    <Text style={styles.heroDesc}>{item.desc}</Text>
 
-        {/* ── Hero Banner ── */}
-        <View style={styles.heroBanner}>
-          <View style={styles.heroBannerLeft}>
-            <Text style={styles.heroSubtitle}>Politeknik Astra · Cikarang</Text>
-            <Text style={styles.heroTitle}>
-              Jual & Beli{"\n"}Barang Bekas{"\n"}Kampus
-            </Text>
-            <TouchableOpacity style={styles.heroButton}>
-              <Text style={styles.heroButtonText}>Jelajahi →</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.heroBannerRight}>
-            <Text style={styles.heroBannerEmoji}>🛍️</Text>
-          </View>
-        </View>
-
-        {/* ── Categories ── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[
-                styles.categoryChip,
-                activeCategory === cat.id && styles.categoryChipActive,
-              ]}
-              onPress={() => setActiveCategory(cat.id)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  activeCategory === cat.id && styles.categoryChipTextActive,
-                ]}
-              >
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* ── Section Header ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Barang Terbaru</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionLink}>Lihat Semua</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Product Grid ── */}
-        <View style={styles.productGrid}>
-          {DUMMY_ITEMS.map((item) => (
-            <View key={item.id} style={styles.productGridItem}>
-              <ProductCard
-                item={item}
-                theme={theme}
-                styles={styles}
-                isDark={isDark}
-              />
-            </View>
-          ))}
-        </View>
-
-        {/* Bottom padding buat nav bar */}
-        <View style={{ height: 20 }} />
-      </ScrollView>
-
-      {/* ── Bottom Navigation ── */}
-      <View style={styles.bottomNav}>
-        {NAV_TABS.map((tab) => {
-          if (tab.isCenter) {
-            return (
-              <TouchableOpacity key={tab.id} style={styles.navCenterBtn}>
-                <View style={styles.navCenterCircle}>
-                  <Text style={styles.navCenterIcon}>{tab.icon}</Text>
+                    <TouchableOpacity style={styles.heroDetailsBtnContainer} activeOpacity={0.8}>
+                      <BlurView
+                        intensity={40}
+                        tint={isDark ? 'dark' : 'light'}
+                        experimentalBlurMethod="dimezisBlurView"
+                        style={styles.heroDetailsBtn}
+                      >
+                        <Text style={styles.heroDetailsBtnText}>{item.buttonText}</Text>
+                      </BlurView>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.heroRight}>
+                    <Text style={styles.heroProductEmoji}>{item.emoji}</Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
-            );
-          }
-          const isActive = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.navTab}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Text style={[styles.navIcon, isActive && styles.navIconActive]}>
-                {tab.icon}
-              </Text>
-              <Text
-                style={[styles.navLabel, isActive && styles.navLabelActive]}
-              >
-                {tab.label}
-              </Text>
-              {isActive && <View style={styles.navActiveDot} />}
+              )}
+            />
+          </View>
+
+          {/* Carousel Dots di Luar Card */}
+          <View style={styles.carouselDots}>
+            {HERO_BANNERS.map((_, i) => {
+              const cardWidth = Dimensions.get('window').width - 48;
+
+              const inputRange = [];
+              const widthOutputRange = [];
+              const colorOutputRange = [];
+
+              INFINITE_BANNERS.forEach((_, index) => {
+                inputRange.push(index * cardWidth);
+                if (index % HERO_BANNERS.length === i) {
+                  widthOutputRange.push(16);
+                  colorOutputRange.push(Colors.primary.yellow500);
+                } else {
+                  widthOutputRange.push(6);
+                  colorOutputRange.push(isDark ? '#2E2E45' : '#D1D5DB');
+                }
+              });
+
+              const dotWidth = scrollX.interpolate({
+                inputRange,
+                outputRange: widthOutputRange,
+                extrapolate: 'clamp',
+              });
+
+              const dotColor = scrollX.interpolate({
+                inputRange,
+                outputRange: colorOutputRange,
+                extrapolate: 'clamp',
+              });
+
+              return (
+                <Animated.View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    { width: dotWidth, backgroundColor: dotColor },
+                  ]}
+                />
+              );
+            })}
+          </View>
+        </View>
+
+        {/* 3. Quick Menus (Pengganti Kategori) */}
+        <View style={styles.quickMenuContainer}>
+          {QUICK_MENUS.map((menu) => (
+            <TouchableOpacity key={menu.id} style={styles.quickMenuItem} activeOpacity={0.7}>
+              <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? menu.bgDark : menu.bgLight }]}>
+                <MaterialCommunityIcons name={menu.icon} size={28} color={menu.color} />
+              </View>
+              <Text style={styles.quickMenuLabel}>{menu.label}</Text>
             </TouchableOpacity>
-          );
-        })}
-      </View>
+          ))}
+        </View>
+
+        {/* 4. Main Feed: Terbaru / For You (Masonry) */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Rekomendasi</Text>
+        </View>
+        <View style={styles.masonryContainer}>
+          <View style={styles.masonryColumn}>
+            {LATEST_ITEMS.filter((_, i) => i % 2 === 0).map((item) => (
+              <ProductCard
+                key={item.id}
+                item={item}
+                isFavorite={favorites.includes(item.id)}
+                layout="masonry"
+                onFavoritePress={() => toggleFavorite(item.id)}
+                style={{ marginBottom: 16 }}
+              />
+            ))}
+          </View>
+          <View style={styles.masonryColumn}>
+            {LATEST_ITEMS.filter((_, i) => i % 2 !== 0).map((item) => (
+              <ProductCard
+                key={item.id}
+                item={item}
+                isFavorite={favorites.includes(item.id)}
+                layout="masonry"
+                onFavoritePress={() => toggleFavorite(item.id)}
+                style={{ marginBottom: 16 }}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Jarak pemisah untuk menghindari tertutup bottom nav */}
+        <View style={{ height: 120 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+/* =====================================================================
+   STYLES
+===================================================================== */
 
-const StatusBadge = ({ status, styles }) => {
-  const config = {
-    Available: {
-      bg: Colors.semantic.success.light,
-      text: Colors.semantic.success.dark,
-      label: "Tersedia",
-    },
-    Booked: {
-      bg: Colors.semantic.warning.light,
-      text: Colors.semantic.warning.dark,
-      label: "Booked",
-    },
-    Sold: {
-      bg: Colors.semantic.error.light,
-      text: Colors.semantic.error.dark,
-      label: "Terjual",
-    },
-  };
-  const c = config[status] || config.Available;
-  return (
-    <View style={[styles.statusBadge, { backgroundColor: c.bg }]}>
-      <Text style={[styles.statusBadgeText, { color: c.text }]}>{c.label}</Text>
-    </View>
-  );
-};
-
-const ProductCard = ({ item, theme, styles, isDark }) => (
-  <TouchableOpacity activeOpacity={0.85} style={styles.productCard}>
-    <View
-      style={[
-        styles.productImagePlaceholder,
-        {
-          backgroundColor: isDark ? Colors.dark.border : Colors.primary.blue100,
-        },
-      ]}
-    >
-      {item.isHot && (
-        <View style={styles.hotBadge}>
-          <Text style={styles.hotBadgeText}>HOT</Text>
-        </View>
-      )}
-      <Text style={styles.productImageIcon}>📦</Text>
-    </View>
-
-    <View style={styles.productCardBody}>
-      <Text style={styles.productTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <Text style={styles.productCondition}>{item.condition}</Text>
-      <Text style={styles.productPrice}>{item.price}</Text>
-      <View style={styles.productCardFooter}>
-        <StatusBadge status={item.status} styles={styles} />
-        <TouchableOpacity style={styles.wishlistBtn}>
-          <Text style={styles.wishlistIcon}>♡</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </TouchableOpacity>
-);
-
-// ─── Dummy Data ────────────────────────────────────────────────────────────────
-
-const CATEGORIES = [
-  { id: "0", label: "Semua" },
-  { id: "1", label: "Elektronik" },
-  { id: "2", label: "Buku" },
-  { id: "3", label: "Pakaian" },
-  { id: "4", label: "Kos" },
-  { id: "5", label: "Alat Tulis" },
-];
-
-const DUMMY_ITEMS = [
-  {
-    id: "1",
-    title: "Laptop ASUS VivoBook S14",
-    price: "Rp 5.500.000",
-    condition: "Seperti Baru",
-    status: "Available",
-    seller: "Rizky F.",
-    isHot: true,
-  },
-  {
-    id: "2",
-    title: "Paket Buku Teknik Mesin Sem. 3",
-    price: "Rp 175.000",
-    condition: "Baik",
-    status: "Available",
-    seller: "Ahmad S.",
-    isHot: false,
-  },
-  {
-    id: "3",
-    title: "Kalkulator Casio FX-991EX",
-    price: "Rp 280.000",
-    condition: "Sangat Baik",
-    status: "Booked",
-    seller: "Siti R.",
-    isHot: false,
-  },
-  {
-    id: "4",
-    title: "Mechanical Keyboard Leopold",
-    price: "Rp 850.000",
-    condition: "Seperti Baru",
-    status: "Available",
-    seller: "Kevin N.",
-    isHot: true,
-  },
-  {
-    id: "5",
-    title: "Jaket Kampus Poltek Astra",
-    price: "Rp 120.000",
-    condition: "Baik",
-    status: "Available",
-    seller: "Budi S.",
-    isHot: false,
-  },
-  {
-    id: "6",
-    title: "Mouse Logitech MX Master 3",
-    price: "Rp 650.000",
-    condition: "Sangat Baik",
-    status: "Available",
-    seller: "Andi P.",
-    isHot: false,
-  },
-];
-
-// ─── DYNAMIC STYLES GENERATOR ──────────────────────────────────────────────────
-// Fungsi ini menghasilkan style baru setiap kali tema HP berubah (Light <-> Dark)
 const getStyles = (theme, isDark) => {
-  const shadowColor = isDark ? "#000000" : Colors.primary.blue500;
-  const shadowOpacity = isDark ? 0.4 : 0.06;
-
   return StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: theme.background,
     },
-
-    // Header
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      backgroundColor: theme.surface,
-      paddingHorizontal: 20,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    headerLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-    },
-    logo: {
-      fontSize: 22,
-      fontWeight: "800",
-      color: Colors.primary.blue500,
-      letterSpacing: -0.5,
-    },
-    logoDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: Colors.primary.yellow500,
-      marginLeft: 2,
-    },
-    headerRight: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-    },
-    headerIconBtn: {
-      padding: 4,
-    },
-    headerIcon: {
-      fontSize: 20,
-    },
-    avatarCircle: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: Colors.primary.blue100,
-      borderWidth: 2,
-      borderColor: Colors.primary.blue500,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    avatarText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: Colors.primary.blue500,
-    },
-
-    // Scroll
     scrollView: {
       flex: 1,
     },
     scrollContent: {
       paddingBottom: 20,
     },
-
-    // Search Bar
-    searchBarWrapper: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: theme.surface,
-      marginHorizontal: 16,
-      marginTop: 14,
-      marginBottom: 4,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 50,
-      borderWidth: 1,
-      borderColor: theme.border,
-      gap: 8,
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.background,
+      paddingHorizontal: 24,
+      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
+      paddingBottom: 12,
     },
-    searchIcon: {
-      fontSize: 16,
-      color: theme.text.placeholder,
+    logoContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
     },
-    searchInput: {
-      flex: 1,
-      fontSize: 14,
-      color: theme.text.primary,
-      padding: 0,
+    logoText: {
+      fontFamily: 'Barlow-Black',
+      fontSize: 22,
+      letterSpacing: -0.5,
     },
-
-    // Hero Banner (Tetap Biru)
-    heroBanner: {
-      flexDirection: "row",
-      backgroundColor: Colors.primary.blue500,
-      marginHorizontal: 16,
-      marginVertical: 14,
-      borderRadius: 20,
-      padding: 20,
-      overflow: "hidden",
-      minHeight: 140,
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
     },
-    heroBannerLeft: {
-      flex: 1,
-      justifyContent: "space-between",
+    iconButton: {
+      padding: 4,
+      position: 'relative',
     },
-    heroSubtitle: {
-      color: Colors.primary.blue200,
-      fontSize: 11,
-      fontWeight: "500",
+    notificationDot: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: Colors.semantic.error.main,
+      borderWidth: 1.5,
+      borderColor: theme.background,
+    },
+    heroCardContainer: {
+      marginTop: 10,
+    },
+    heroCardBg: {
+      backgroundColor: isDark ? Colors.primary.blue700 : Colors.primary.blue500,
+      marginHorizontal: 24,
+      borderRadius: 24,
+      minHeight: 160,
+      overflow: 'hidden',
+    },
+    heroSlide: {
+      flexDirection: 'row',
+      width: Dimensions.get('window').width - 48,
+      padding: 24,
+    },
+    heroLeft: {
+      flex: 1.3,
+      justifyContent: 'center',
+    },
+    heroTagline: {
+      fontFamily: 'Barlow-Bold',
+      fontSize: 10,
+      color: Colors.primary.yellow500,
+      letterSpacing: 1.5,
       marginBottom: 6,
     },
     heroTitle: {
-      color: "#FFFFFF",
-      fontSize: 20,
-      fontWeight: "800",
+      fontFamily: 'Barlow-Black',
+      fontSize: 22,
+      color: '#FFFFFF',
+      letterSpacing: -0.5,
       lineHeight: 26,
-      letterSpacing: -0.4,
-      flex: 1,
     },
-    heroButton: {
-      backgroundColor: Colors.primary.yellow500,
-      alignSelf: "flex-start",
+    heroDesc: {
+      fontFamily: 'Barlow-Regular',
+      fontSize: 11,
+      color: 'rgba(255, 255, 255, 0.85)',
+      marginTop: 6,
+      lineHeight: 16,
+    },
+    heroDetailsBtnContainer: {
+      alignSelf: 'flex-start',
+      marginTop: 16,
+      borderRadius: 50,
+      overflow: 'hidden',
+    },
+    heroDetailsBtn: {
       paddingHorizontal: 16,
       paddingVertical: 8,
-      borderRadius: 50,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    heroDetailsBtnText: {
+      fontFamily: 'Barlow-Bold',
+      fontSize: 11,
+      color: '#FFFFFF',
+    },
+    heroRight: {
+      flex: 0.7,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heroProductEmoji: {
+      fontSize: 60,
+    },
+    carouselDots: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 6,
       marginTop: 12,
     },
-    heroButtonText: {
-      color: "#1A1A2E",
-      fontSize: 13,
-      fontWeight: "700",
+    dot: {
+      height: 6,
+      borderRadius: 3,
     },
-    heroBannerRight: {
-      alignItems: "center",
-      justifyContent: "center",
-      paddingLeft: 10,
-    },
-    heroBannerEmoji: {
-      fontSize: 62,
-      opacity: 0.9,
-    },
-
-    // Categories
-    categoryScroll: {
-      marginBottom: 4,
-    },
-    categoryScrollContent: {
-      paddingHorizontal: 16,
-      gap: 8,
-    },
-    categoryChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 50,
-      backgroundColor: theme.surface,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-    },
-    categoryChipActive: {
-      backgroundColor: Colors.primary.blue500,
-      borderColor: Colors.primary.blue500,
-    },
-    categoryChipText: {
-      fontSize: 13,
-      fontWeight: "600",
-      color: theme.text.secondary,
-    },
-    categoryChipTextActive: {
-      color: "#FFFFFF",
-    },
-
-    // Section Header
     sectionHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      marginTop: 16,
-      marginBottom: 12,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      marginTop: 28,
+      marginBottom: 16,
     },
     sectionTitle: {
-      fontSize: 17,
-      fontWeight: "800",
+      fontFamily: 'Barlow-Black',
+      fontSize: 18,
       color: theme.text.heading,
-      letterSpacing: -0.3,
+      letterSpacing: -0.4,
     },
     sectionLink: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontFamily: 'Barlow-Bold',
+      fontSize: 12,
       color: Colors.primary.blue500,
     },
-
-    // Product Grid
-    productGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      paddingHorizontal: 12,
-      gap: 10,
+    horizontalScroll: {
+      marginBottom: 10,
     },
-    productGridItem: {
-      width: "47.5%",
+    horizontalScrollContent: {
+      paddingHorizontal: 24,
+      gap: 16,
     },
-    productCard: {
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.border,
-      overflow: "hidden",
-      shadowColor: shadowColor,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: shadowOpacity,
-      shadowRadius: 8,
-      elevation: 3,
+    quickMenuContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      marginTop: 24,
+      marginBottom: 8,
     },
-    productImagePlaceholder: {
-      height: 120,
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
+    quickMenuItem: {
+      alignItems: 'center',
+      width: 80,
     },
-    productImageIcon: {
-      fontSize: 40,
+    quickMenuIconBg: {
+      width: 56,
+      height: 56,
+      borderRadius: 20,
+      marginBottom: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
-    hotBadge: {
-      position: "absolute",
-      top: 8,
-      left: 8,
-      backgroundColor: Colors.primary.yellow500,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 50,
-      zIndex: 1,
+    quickMenuLabel: {
+      fontFamily: 'Barlow-Medium',
+      fontSize: 11, // Kecilin dikit biar muat 1 baris
+      color: isDark ? '#E5E7EB' : Colors.primary.blue500,
+      textAlign: 'center',
     },
-    hotBadgeText: {
-      fontSize: 10,
-      fontWeight: "800",
-      color: "#1A1A2E",
+    masonryContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 24,
+      justifyContent: 'space-between',
     },
-    productCardBody: {
-      padding: 10,
-      gap: 3,
-    },
-    productTitle: {
-      fontSize: 13,
-      fontWeight: "700",
-      color: theme.text.heading,
-      lineHeight: 18,
-    },
-    productCondition: {
-      fontSize: 11,
-      color: theme.text.secondary,
-      marginTop: 1,
-    },
-    productPrice: {
-      fontSize: 14,
-      fontWeight: "800",
-      color: Colors.primary.blue500,
-      marginTop: 3,
-    },
-    productCardFooter: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginTop: 6,
-    },
-    statusBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 50,
-    },
-    statusBadgeText: {
-      fontSize: 10,
-      fontWeight: "700",
-    },
-    wishlistBtn: {
-      padding: 2,
-    },
-    wishlistIcon: {
-      fontSize: 18,
-      color: theme.text.placeholder,
-    },
-
-    // Bottom Navigation
-    bottomNav: {
-      flexDirection: "row",
-      backgroundColor: theme.surface,
-      borderTopWidth: 1,
-      borderTopColor: theme.border,
-      paddingBottom: Platform.OS === "ios" ? 20 : 8,
-      paddingTop: 8,
-      paddingHorizontal: 8,
-    },
-    navTab: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-      paddingVertical: 4,
-    },
-    navIcon: {
-      fontSize: 22,
-      color: theme.text.placeholder,
-    },
-    navIconActive: {
-      color: Colors.primary.blue500,
-    },
-    navLabel: {
-      fontSize: 10,
-      fontWeight: "500",
-      color: theme.text.placeholder,
-      marginTop: 2,
-    },
-    navLabelActive: {
-      color: Colors.primary.blue500,
-      fontWeight: "700",
-    },
-    navActiveDot: {
-      position: "absolute",
-      bottom: -4,
-      width: 4,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: Colors.primary.blue500,
-    },
-    navCenterBtn: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 12,
-    },
-    navCenterCircle: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor: Colors.primary.yellow500,
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: Colors.primary.yellow500,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 8,
-      elevation: 6,
-    },
-    navCenterIcon: {
-      fontSize: 26,
-      color: "#1A1A2E",
-      fontWeight: "800",
-      lineHeight: 28,
+    masonryColumn: {
+      width: '47.5%', // Memberi ruang buat gap di tengah
     },
   });
 };

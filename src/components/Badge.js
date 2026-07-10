@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Colors from '../constants/Colors';
+import Colors from '../constants/colors';
 
 export default function Badge({
   label,

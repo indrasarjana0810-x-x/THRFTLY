@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { View, StyleSheet, useColorScheme } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import Colors from '../constants/Colors';
+import { MaterialIcons } from '@expo/vector-icons';
+import Colors from '../constants/colors';
 import CustomText from './CustomText';
 import CustomButton from './CustomButton';
 
@@ -22,7 +22,7 @@ export default function EmptyState({
   return (
     <View style={[styles.container, style]}>
       <View style={[styles.iconCircle, { backgroundColor: isDark ? '#232335' : '#F3F4F6' }]}>
-        <Feather name={icon} size={32} color={Colors.primary.blue500} />
+        <MaterialIcons name={icon} size={32} color={Colors.primary.blue500} />
       </View>
       
       <CustomText type="h2" style={styles.title}>

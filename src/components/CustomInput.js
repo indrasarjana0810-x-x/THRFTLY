@@ -14,8 +14,8 @@ import {
   StyleSheet,
   useColorScheme,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import Colors from "../constants/Colors";
+import { MaterialIcons } from "@expo/vector-icons";
+import Colors from "../constants/colors";
 
 const CustomInput = forwardRef(
   (
@@ -57,15 +57,7 @@ const CustomInput = forwardRef(
       },
     }));
 
-    const handleFocus = () => {
-      console.log(label, "FOCUS");
-      setIsFocused(true);
-    };
 
-    const handleBlur = () => {
-      console.log(label, "BLUR"); 
-      setIsFocused(false);
-    };
 
     // Combine static styles with dynamic theme / error / focus styles
     const labelStyle = [
@@ -76,7 +68,7 @@ const CustomInput = forwardRef(
     const inputWrapperStyle = [
       styles.inputWrapper,
       {
-        backgroundColor: isDark ? Colors.dark.background : "#F9FAFB",
+        backgroundColor: isDark ? "#0F0F1A" : "#F9FAFB",
         borderColor: error ? Colors.semantic.error.main : theme.border,
       },
       isFocused && {
@@ -109,11 +101,12 @@ const CustomInput = forwardRef(
             secureTextEntry={isPassword && !showPassword}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
+            spellCheck={false}
             returnKeyType={returnKeyType}
             blurOnSubmit={blurOnSubmit}
             onSubmitEditing={onSubmitEditing}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             {...props}
           />
 
@@ -123,8 +116,8 @@ const CustomInput = forwardRef(
               onPress={() => setShowPassword(!showPassword)}
               activeOpacity={0.7}
             >
-              <Feather
-                name={showPassword ? "eye" : "eye-off"}
+              <MaterialIcons
+                name={showPassword ? "visibility" : "visibility-off"}
                 size={18}
                 color={theme.text.secondary}
               />

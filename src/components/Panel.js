@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { View, StyleSheet, useColorScheme } from 'react-native';
-import Colors from '../constants/Colors';
+import Colors from '../constants/colors';
 
 export default function Panel({
   children,
@@ -26,8 +26,8 @@ export default function Panel({
 /* Styles */
 
 const getStyles = (theme, isDark, shadow) => {
-  const shadowColor = isDark ? '#000000' : Colors.primary.blue500;
-  const shadowOpacity = isDark ? 0.4 : 0.08;
+  const shadowColor = Colors.primary.blue500;
+  const shadowOpacity = isDark ? 0.35 : 0.15; // Neon glow effect
 
   return StyleSheet.create({
     panel: {
@@ -36,13 +36,13 @@ const getStyles = (theme, isDark, shadow) => {
       borderWidth: 1.5,
       borderColor: theme.border,
       padding: 24,
-      // Bayangan premium jika shadow diset true  //
+      // Bayangan premium jika shadow diset true
       ...(shadow && {
         shadowColor: shadowColor,
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 12 },
         shadowOpacity: shadowOpacity,
         shadowRadius: 20,
-        elevation: 6,
+        elevation: 12, // Fallback untuk Android
       }),
     },
   });

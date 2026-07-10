@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Text, StyleSheet, useColorScheme } from 'react-native';
-import Colors from '../constants/Colors';
+import Colors from '../constants/colors';
 
 export default function CustomText({
   children,
@@ -19,7 +19,7 @@ export default function CustomText({
 
   const getTextStyle = () => {
     const baseStyle = [styles.text];
-    
+
     if (type === 'h1') baseStyle.push(styles.h1);
     else if (type === 'h2') baseStyle.push(styles.h2);
     else if (type === 'h3') baseStyle.push(styles.h3);
