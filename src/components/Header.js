@@ -3,8 +3,8 @@
 ========================================== */
 /* ---------- Imports ---------- */
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity, useColorScheme, Platform, StatusBar } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
 import { useNavigation } from '@react-navigation/native';
 
@@ -22,11 +22,11 @@ export default function Header({ title, showBack = true, rightComponent }) {
   const theme = isDark ? Colors.dark : Colors.light;
   
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.leftSide}>
         {showBack && (
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialIcons name="arrow-back-ios" size={20} color={theme.text.primary} />
+            <Ionicons name="chevron-back" size={24} color={theme.text.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -45,11 +45,16 @@ export default function Header({ title, showBack = true, rightComponent }) {
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({
   container: {
-    height: 56,
+    height: Platform.OS === 'android' ? 56 + (StatusBar.currentHeight || 0) : 56,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 4,
   },
   leftSide: {
     flex: 1,

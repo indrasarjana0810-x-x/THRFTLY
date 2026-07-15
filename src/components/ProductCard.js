@@ -11,8 +11,12 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Colors from '../constants/colors';
+import { Shadows } from '../constants/styles';
 import CustomText from './CustomText';
 import Badge from './Badge';
+import { Image } from 'expo-image';
+import { useLanguage } from '../localization/LanguageContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 export default function ProductCard({
   item,
@@ -26,6 +30,7 @@ export default function ProductCard({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
+  const { t, locale } = useLanguage();
 
   const cardStyles = getStyles(theme, isDark);
 
@@ -34,6 +39,17 @@ export default function ProductCard({
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const particleAnim = useRef(new Animated.Value(0)).current;
+
+  const getMasonryHeight = () => {
+    if (item.imageHeight) return item.imageHeight;
+    const id = item.idItem || item.id || '';
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const heights = [130, 160, 180, 200];
+    return heights[Math.abs(hash) % heights.length];
+  };
 
   const handleFavoritePress = () => {
     if (!isFavorite) {
@@ -61,9 +77,9 @@ export default function ProductCard({
 
   const renderStatusBadge = (status) => {
     const config = {
-      Available: { type: 'success', label: 'Tersedia' },
-      Booked: { type: 'warning', label: 'Booked' },
-      Sold: { type: 'danger', label: 'Terjual' },
+      Available: { type: 'success', label: t('status.available') || 'Tersedia' },
+      Booked: { type: 'warning', label: t('status.booked') || 'Dipesan' },
+      Sold: { type: 'danger', label: t('status.sold') || 'Terjual' },
     };
     const c = config[status] || config.Available;
     
@@ -91,7 +107,7 @@ export default function ProductCard({
       <View style={[
         cardStyles.imageArea,
         isPopular ? cardStyles.popularImageArea : (isMasonry ? cardStyles.masonryImageArea : cardStyles.gridImageArea),
-        isMasonry && item.imageHeight && { height: item.imageHeight }
+        isMasonry && { height: getMasonryHeight() }
       ]}>
         {/* Badge status di pojok kanan atas  // */}
         {renderStatusBadge(item.status)}
@@ -149,19 +165,37 @@ export default function ProductCard({
               <MaterialIcons
                 name={isFavorite ? "bookmark" : "bookmark-border"}
                 size={15}
-                color={isFavorite ? Colors.primary.yellow500 : "#9CA3AF"}
+                color={isFavorite ? Colors.primary.yellow500 : theme.text.placeholder}
               />
             </Animated.View>
           </TouchableOpacity>
         </View>
         
-        {/* Ilustrasi produk berupa emoji  // */}
-        <CustomText style={[
-          cardStyles.productEmoji,
-          isPopular ? cardStyles.popularProductEmoji : cardStyles.gridProductEmoji
-        ]}>
-          {item.imageEmoji}
-        </CustomText>
+        {/* Gambar produk jika ada, jika tidak fallback ke emoji */}
+        {item.imageUris && item.imageUris.length > 0 ? (
+          <Image
+            source={{ uri: item.imageUris[0] }}
+            style={{ width: '100%', height: '100%', position: 'absolute' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+        ) : item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={{ width: '100%', height: '100%', position: 'absolute' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+        ) : (
+          <CustomText style={[
+            cardStyles.productEmoji,
+            isPopular ? cardStyles.popularProductEmoji : cardStyles.gridProductEmoji
+          ]}>
+            {item.imageEmoji || '📦'}
+          </CustomText>
+        )}
       </View>
 
       {/* Bagian detail keterangan produk (Glassmorphism) */}
@@ -179,14 +213,14 @@ export default function ProductCard({
             {item.condition}
           </CustomText>
           <View style={cardStyles.locationWrapper}>
-            <MaterialIcons name="location-on" size={10} color="#9CA3AF" />
+            <MaterialIcons name="location-on" size={10} color={theme.text.placeholder} />
             <CustomText type="caption" style={cardStyles.productLocation}>
               {item.location || '1.2 km'}
             </CustomText>
           </View>
         </View>
         <CustomText type="body-bold" color={Colors.primary.blue500} style={cardStyles.productPrice}>
-          {item.price}
+          {typeof item.price === 'number' ? formatCurrency(item.price, locale) : item.price}
         </CustomText>
       </BlurView>
     </TouchableOpacity>
@@ -204,13 +238,9 @@ const getStyles = (theme, isDark) => {
       backgroundColor: 'transparent', // Biar efek kaca tembus ke background
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.4)', // Glass border
+      borderColor: theme.border, // Dynamic border token
       overflow: 'hidden',
-      shadowColor: shadowColor,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: shadowOpacity,
-      shadowRadius: 10,
-      elevation: 4,
+      ...Shadows.primary,
     },
     popularCard: {
       width: 156,
@@ -228,14 +258,14 @@ const getStyles = (theme, isDark) => {
     },
     popularImageArea: {
       height: 140,
-      backgroundColor: isDark ? '#252538' : '#F9FBFD',
+      backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
     },
     gridImageArea: {
       height: 120,
-      backgroundColor: isDark ? '#252538' : '#F9FBFD',
+      backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
     },
     masonryImageArea: {
-      backgroundColor: isDark ? '#252538' : '#F9FBFD',
+      backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
       // Height di-set dinamis lewat inline style di komponen
     },
     productEmoji: {
@@ -257,14 +287,10 @@ const getStyles = (theme, isDark) => {
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: isDark ? '#11111E' : '#FFFFFF',
+      backgroundColor: theme.surface,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 4,
-      elevation: 3,
+      ...Shadows.light,
     },
     statusBadge: {
       position: 'absolute',
@@ -296,7 +322,7 @@ const getStyles = (theme, isDark) => {
     },
     productLocation: {
       fontSize: 10,
-      color: '#9CA3AF',
+      color: theme.text.placeholder,
     },
     productPrice: {
       fontSize: 13,

@@ -1,12 +1,13 @@
-// src/screens/auth/ForgotPasswordScreen.js
-
+/* ==========================================
+   ForgotPassword Screen Component
+========================================== */
+/* ---------- Imports ---------- */
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Platform,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   Animated,
   Keyboard,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Colors from "../../constants/colors";
 import ThriftlyLogo from "../../components/ThriftlyLogo";
 import CustomInput from "../../components/CustomInput";
@@ -24,26 +26,32 @@ import Panel from "../../components/Panel";
 import { MaterialIcons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useToast } from "../../components/Toast";
+import { useLanguage } from "../../localization/LanguageContext";
 
+/**
+ * ForgotPasswordScreen
+ * Halaman untuk memulihkan kata sandi pengguna.
+ * Menggunakan sistem verifikasi kode OTP 6 digit.
+ */
 export default function ForgotPasswordScreen({ onNavigateToLogin }) {
+  const { t } = useLanguage();
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // States untuk data input  //
+  /* ---------- Component States & Refs ---------- */
   const [nim, setNim] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState({});
 
-  // Refs untuk input focus  //
   const otpRef = useRef(null);
   const passwordRef = useRef(null);
   const confirmPasswordRef = useRef(null);
   const scrollRef = useRef(null);
 
-  // Animasi layout geser  //
+  /* ---------- Animation Values ---------- */
   const step1X = useRef(new Animated.Value(0)).current;
   const step2X = useRef(new Animated.Value(500)).current;
   const step3X = useRef(new Animated.Value(500)).current;
@@ -57,7 +65,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
 
   const styles = getStyles(theme, isDark);
 
-  // Efek geser step  //
+  /* ---------- Lifecycle & Effects ---------- */
   useEffect(() => {
     if (step === 1) {
       Animated.parallel([
@@ -90,7 +98,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
         Animated.spring(step3X, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
       ]).start();
       
-      // Animasikan checkPop2 saja (Node 2 selesai) //
+      // Animasikan checkPop2 saja (Node 2 selesai)
       checkPop2.setValue(0.3);
       Animated.spring(checkPop2, {
         toValue: 1,
@@ -101,7 +109,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     }
   }, [step]);
 
-  // Geser form saat keyboard aktif  //
+  /* ---------- Keyboard Avoidance ---------- */
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -121,7 +129,8 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     };
   }, [shiftAnim]);
 
-  // Request OTP  //
+  /* ---------- Authentication Logic ---------- */
+  // Request OTP
   const handleRequestOtp = async () => {
     setErrors({});
     if (!nim.trim()) {
@@ -133,10 +142,12 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     try {
       const data = await api.auth.forgotPassword(nim.trim());
       if (data.status === "SUCCESS") {
-        showToast("Kode OTP berhasil dikirim! Cek log konsol server.", "success");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_success') || "Kode OTP berhasil dikirim!", "success");
         setStep(2);
       } else {
-        showToast(data.message || "Email/NIM tidak terdaftar", "danger");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.toast_email_not_found') || "Email/NIM tidak terdaftar", "danger");
       }
     } catch (err) {
       console.log(err);
@@ -150,7 +161,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     }
   };
 
-  // Verifikasi OTP  //
+  // Verifikasi OTP
   const handleVerifyOtp = async () => {
     setErrors({});
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
@@ -162,10 +173,12 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     try {
       const data = await api.auth.verifyOtp(nim.trim(), otpCode.trim());
       if (data.status === "SUCCESS") {
-        showToast("Verifikasi OTP sukses!", "success");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_verify_success') || "Verifikasi OTP sukses!", "success");
         setStep(3);
       } else {
-        showToast(data.message || "Kode OTP salah atau kedaluwarsa", "danger");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_verify_failed') || "Kode OTP salah", "danger");
       }
     } catch (err) {
       console.log(err);
@@ -179,7 +192,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     }
   };
 
-  // Reset Password  //
+  // Reset Password
   const handleResetPassword = async () => {
     setErrors({});
     let localErrors = {};
@@ -203,10 +216,12 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     try {
       const data = await api.auth.resetPassword(nim.trim(), otpCode.trim(), newPassword);
       if (data.status === "SUCCESS") {
-        showToast("Kata sandi berhasil diperbarui!", "success");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.toast_password_updated') || "Kata sandi diperbarui!", "success");
         onNavigateToLogin();
       } else {
-        showToast(data.message || "Gagal mengatur ulang kata sandi", "danger");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.toast_password_update_failed') || "Gagal mengatur ulang kata sandi", "danger");
       }
     } catch (err) {
       console.log(err);
@@ -263,9 +278,9 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                 <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
               </CustomText>
 
-              {/* Stepper Node 3 Tahap Lupa Sandi  // */}
+              {/* Stepper Node 3 Tahap Lupa Sandi */}
               <View style={styles.stepperContainer}>
-                {/* Pembungkus Garis Konektor dengan Flexbox  // */}
+                {/* Pembungkus Garis Konektor dengan Flexbox */}
                 <View style={styles.stepConnectorLineContainer} pointerEvents="none">
                   <View style={styles.lineSegment}>
                     {step > 1 && <View style={styles.stepConnectorLineFill} />}
@@ -275,8 +290,8 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     {step > 2 && <View style={styles.stepConnectorLineFill} />}
                   </View>
                 </View>
-
-                {/* Node 1: Akun  // */}
+ 
+                {/* Node 1: Akun */}
                 <View style={styles.stepNodeContainer}>
                   {step > 1 && <View style={styles.glowRing} />}
                   <View
@@ -299,8 +314,8 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     Akun
                   </Text>
                 </View>
-
-                {/* Node 2: OTP  // */}
+ 
+                {/* Node 2: OTP */}
                 <View style={styles.stepNodeContainer}>
                   {step > 2 && <View style={styles.glowRing} />}
                   <View
@@ -323,8 +338,8 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     OTP
                   </Text>
                 </View>
-
-                {/* Node 3: Sandi  // */}
+ 
+                {/* Node 3: Sandi */}
                 <View style={styles.stepNodeContainer}>
                   <View
                     style={[
@@ -341,13 +356,13 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                   </Text>
                 </View>
               </View>
-
+ 
               <View style={{ overflow: "hidden", minHeight: 310, width: "100%" }}>
-                {/* STEP 1: Minta OTP  // */}
+                {/* ---------- STEP 1: Minta OTP ---------- */}
                 <Animated.View style={{ transform: [{ translateX: step1X }], width: "100%" }}>
                   <CustomInput
                     label="NIM atau Email AstraTech"
-                    placeholder="Masukkan NIM / Email"
+                    placeholder={t('auth.nim_email_placeholder2') || 'Masukkan NIM / Email'}
                     value={nim}
                     onChangeText={(text) => {
                       setNim(text);
@@ -359,23 +374,24 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     returnKeyType="done"
                     blurOnSubmit={true}
                     error={errors.nim}
-                    icon={<MaterialIcons name="email" size={16} color={theme.text.secondary} />}
+                    iconName="mail"
+                    isRequired={true}
                   />
                   <CustomButton
-                    title="Kirim OTP"
+                    title={t('auth.send_otp_btn') || 'Kirim OTP'}
                     onPress={handleRequestOtp}
                     type="primary"
                     loading={loading}
                     style={styles.submitBtn}
                   />
                 </Animated.View>
-
-                {/* STEP 2: Verifikasi OTP  // */}
+ 
+                {/* ---------- STEP 2: Verifikasi OTP ---------- */}
                 <Animated.View style={{ transform: [{ translateX: step2X }], position: "absolute", top: 0, width: "100%" }}>
                   <CustomInput
                     ref={otpRef}
                     label="Kode OTP (6 Digit)"
-                    placeholder="Masukkan 6 digit kode"
+                    placeholder={t('auth.otp_placeholder') || 'Masukkan 6 digit kode'}
                     value={otpCode}
                     onChangeText={(text) => {
                       setOtpCode(text);
@@ -388,17 +404,18 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     returnKeyType="done"
                     blurOnSubmit={true}
                     error={errors.otpCode}
-                    icon={<MaterialIcons name="security" size={16} color={theme.text.secondary} />}
+                    iconName="shield-checkmark"
+                    isRequired={true}
                   />
                   <View style={styles.stepButtons}>
                     <CustomButton
-                      title="Batal"
+                      title={t('auth.cancel_btn') || 'Batal'}
                       onPress={() => setStep(1)}
                       type="secondary"
                       style={styles.backBtn}
                     />
                     <CustomButton
-                      title="Verifikasi"
+                      title={t('auth.verify_btn') || 'Verifikasi'}
                       onPress={handleVerifyOtp}
                       type="primary"
                       loading={loading}
@@ -406,13 +423,13 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     />
                   </View>
                 </Animated.View>
-
-                {/* STEP 3: Reset Password  // */}
+ 
+                {/* ---------- STEP 3: Reset Password ---------- */}
                 <Animated.View style={{ transform: [{ translateX: step3X }], position: "absolute", top: 0, width: "100%" }}>
                   <CustomInput
                     ref={passwordRef}
                     label="Kata Sandi Baru"
-                    placeholder="Minimal 8 karakter"
+                    placeholder={t('auth.password_min_placeholder') || 'Minimal 8 karakter'}
                     value={newPassword}
                     onChangeText={(text) => {
                       setNewPassword(text);
@@ -425,12 +442,13 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     blurOnSubmit={false}
                     onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                     error={errors.newPassword}
-                    icon={<MaterialIcons name="lock" size={16} color={theme.text.secondary} />}
+                    iconName="lock-closed"
+                    isRequired={true}
                   />
                   <CustomInput
                     ref={confirmPasswordRef}
                     label="Konfirmasi Kata Sandi"
-                    placeholder="Ulangi kata sandi baru"
+                    placeholder={t('auth.confirm_password_placeholder') || 'Ulangi kata sandi baru'}
                     value={confirmPassword}
                     onChangeText={(text) => {
                       setConfirmPassword(text);
@@ -443,10 +461,11 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     blurOnSubmit={true}
                     onSubmitEditing={() => Keyboard.dismiss()}
                     error={errors.confirmPassword}
-                    icon={<MaterialIcons name="check-box" size={16} color={theme.text.secondary} />}
+                    iconName="checkmark-circle"
+                    isRequired={true}
                   />
                   <CustomButton
-                    title="Perbarui Sandi"
+                    title={t('auth.update_password_btn') || 'Perbarui Sandi'}
                     onPress={handleResetPassword}
                     type="primary"
                     loading={loading}
@@ -454,11 +473,11 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                   />
                 </Animated.View>
               </View>
-
+ 
               <View style={styles.loginLinkWrapper}>
-                <Text style={styles.loginLabel}>Ingat kata sandi Anda?</Text>
+                <Text style={styles.loginLabel}>{t('auth.remember_password') || 'Ingat kata sandi Anda?'}</Text>
                 <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToLogin}>
-                  <Text style={styles.loginLink}>Masuk Sekarang</Text>
+                  <Text style={styles.loginLink}>{t('auth.login_now') || 'Masuk Sekarang'}</Text>
                 </TouchableOpacity>
               </View>
             </Panel>
@@ -468,7 +487,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     </SafeAreaView>
   );
 }
-
+ 
 const getStyles = (theme, isDark) => {
   return StyleSheet.create({
     safeArea: {
@@ -479,7 +498,7 @@ const getStyles = (theme, isDark) => {
       flexGrow: 1,
       paddingHorizontal: 24,
       paddingVertical: 32,
-      paddingTop: 100, // Menurunkan posisi form 1 tik  //
+      paddingTop: 100, // Menurunkan posisi form
       paddingBottom: Platform.OS === "ios" ? 100 : 80,
     },
     orbsContainer: {

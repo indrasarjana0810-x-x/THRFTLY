@@ -8,7 +8,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Platform,
   ScrollView,
@@ -18,15 +17,18 @@ import {
   Animated,
   Keyboard,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Colors from "../../constants/colors";
 import ThriftlyLogo from "../../components/ThriftlyLogo";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomText from "../../components/CustomText";
 import Panel from "../../components/Panel";
+import SelectionModal from "../../components/SelectionModal";
 import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useToast } from "../../components/Toast";
+import { useLanguage } from "../../localization/LanguageContext";
 
 const STUDY_PROGRAMS = [
   "Teknologi Rekayasa Pemeliharaan Alat Berat",
@@ -50,6 +52,7 @@ const UNIQUE_STUDY_PROGRAMS = [...new Set(STUDY_PROGRAMS)];
 export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }) {
   /* ---------- Component States & Refs ---------- */
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
 
   const [idUser, setIdUser] = useState("");
@@ -163,24 +166,24 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
     let localErrors = {};
 
     if (!idUser.trim()) {
-      localErrors.idUser = "NIM wajib diisi";
+      localErrors.idUser = t('auth.nim_required') || "NIM wajib diisi";
     } else if (idUser.trim().length > 15) {
-      localErrors.idUser = "NIM maksimal 15 karakter";
+      localErrors.idUser = t('auth.nim_max') || "NIM maksimal 15 karakter";
     }
 
     const jsEmailRegex = /^[a-zA-Z0-9]+@polytechnic\.astra\.ac\.id$/;
     if (!email.trim()) {
-      localErrors.email = "Email AstraTech wajib diisi";
+      localErrors.email = t('auth.email_required') || "Email AstraTech wajib diisi";
     } else if (!jsEmailRegex.test(email.trim())) {
-      localErrors.email = "Format email harus [NIM]@polytechnic.astra.ac.id";
+      localErrors.email = t('auth.email_format_error') || "Format email harus [NIM]@polytechnic.astra.ac.id";
     } else if (email.length > 100) {
-      localErrors.email = "Email maksimal 100 karakter";
+      localErrors.email = t('auth.email_max') || "Email maksimal 100 karakter";
     }
 
     if (!password) {
-      localErrors.password = "Kata sandi wajib diisi";
+      localErrors.password = t('auth.password_required') || "Kata sandi wajib diisi";
     } else if (password.length < 8) {
-      localErrors.password = "Kata sandi minimal 8 karakter";
+      localErrors.password = t('auth.password_min') || "Kata sandi minimal 8 karakter";
     }
 
     if (Object.keys(localErrors).length > 0) {
@@ -196,19 +199,19 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
     let localErrors = {};
 
     if (!name.trim()) {
-      localErrors.name = "Nama lengkap wajib diisi";
+      localErrors.name = t('auth.name_required') || "Nama lengkap wajib diisi";
     } else if (name.length > 100) {
-      localErrors.name = "Nama maksimal 100 karakter";
+      localErrors.name = t('auth.name_max') || "Nama maksimal 100 karakter";
     }
 
     if (!studyProgram) {
-      localErrors.studyProgram = "Program studi wajib diisi";
+      localErrors.studyProgram = t('auth.study_program_required') || "Program studi wajib diisi";
     }
 
     if (!phone.trim()) {
-      localErrors.phone = "Nomor telepon wajib diisi";
+      localErrors.phone = t('auth.phone_required') || "Nomor telepon wajib diisi";
     } else if (phone.length > 15) {
-      localErrors.phone = "Nomor telepon maksimal 15 karakter";
+      localErrors.phone = t('auth.phone_max') || "Nomor telepon maksimal 15 karakter";
     }
 
     if (Object.keys(localErrors).length > 0) {
@@ -229,18 +232,21 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
       });
 
       if (data.status === "SUCCESS") {
-        showToast("Pendaftaran Berhasil! Silakan masuk.", "success");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.register_success') || "Pendaftaran Berhasil! Silakan masuk.", "success");
         if (onRegisterSuccess) {
           onRegisterSuccess();
         }
       } else {
-        showToast(data.message || "Gagal melakukan registrasi", "danger");
+        const serverMsg = data.message;
+        showToast(t(`api.${serverMsg}`) || t('auth.register_failed') || "Gagal melakukan registrasi", "danger");
       }
     } catch (err) {
       console.log(err);
-      let errMsg = "Gagal terhubung ke server Spring Boot Anda.";
+      let errMsg = t('auth.server_error') || "Gagal terhubung ke server Spring Boot Anda.";
       if (err.response && err.response.data) {
-        errMsg = err.response.data.message || err.response.data.error || errMsg;
+        let rawCode = err.response.data.message || err.response.data.error;
+        errMsg = t(`api.${rawCode}`) || rawCode || errMsg;
       }
       showToast(errMsg, "danger");
     } finally {
@@ -320,7 +326,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     )}
                   </View>
                   <Text style={[styles.stepLabel, step === 1 ? styles.activeLabel : (step > 1 ? styles.completedLabel : styles.inactiveLabel)]}>
-                    Akun
+                    {t('auth.step_account') || "Akun"}
                   </Text>
                 </View>
 
@@ -336,7 +342,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     </Text>
                   </View>
                   <Text style={[styles.stepLabel, step === 2 ? styles.activeLabel : styles.inactiveLabel]}>
-                    Profil
+                    {t('auth.step_profile') || "Profil"}
                   </Text>
                 </View>
               </View>
@@ -344,8 +350,8 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
               <View style={{ overflow: "hidden", minHeight: 330, width: "100%" }}>
                 <Animated.View style={{ transform: [{ translateX: step1X }], width: "100%" }}>
                   <CustomInput
-                    label="NIM"
-                    placeholder="Masukkan NIM Anda"
+                    label={t('auth.nim_label') || "NIM"}
+                    placeholder={t('auth.nim_placeholder') || "Masukkan NIM Anda"}
                     value={idUser}
                     onChangeText={(text) => {
                       setIdUser(text);
@@ -357,13 +363,14 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     blurOnSubmit={false}
                     onSubmitEditing={() => emailRef.current?.focus()}
                     error={errors.idUser}
-                    icon={<FontAwesome name="tag" size={16} color={theme.text.secondary} />}
+                    iconName="finger-print"
+                    isRequired={true}
                   />
-
+ 
                   <CustomInput
                     ref={emailRef}
-                    label="Email AstraTech"
-                    placeholder="contoh: nim@polytechnic.astra.ac.id"
+                    label={t('auth.email_label') || "Email AstraTech"}
+                    placeholder={t('auth.email_placeholder') || "contoh: nim@polytechnic.astra.ac.id"}
                     value={email}
                     onChangeText={(text) => {
                       setEmail(text);
@@ -376,13 +383,14 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     blurOnSubmit={false}
                     onSubmitEditing={() => passwordRef.current?.focus()}
                     error={errors.email}
-                    icon={<MaterialIcons name="email" size={16} color={theme.text.secondary} />}
+                    iconName="mail"
+                    isRequired={true}
                   />
-
+ 
                   <CustomInput
                     ref={passwordRef}
-                    label="Kata Sandi"
-                    placeholder="Minimal 8 karakter"
+                    label={t('auth.password_label') || "Kata Sandi"}
+                    placeholder={t('auth.password_min_placeholder') || "Minimal 8 karakter"}
                     value={password}
                     onChangeText={(text) => {
                       setPassword(text);
@@ -394,11 +402,12 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     returnKeyType="done"
                     blurOnSubmit={true}
                     error={errors.password}
-                    icon={<MaterialIcons name="lock" size={16} color={theme.text.secondary} />}
+                    iconName="lock-closed"
+                    isRequired={true}
                   />
 
                   <CustomButton
-                    title="Lanjut"
+                    title={t('auth.next_btn') || "Lanjut"}
                     onPress={handleNextStep1}
                     type="primary"
                     style={styles.submitBtn}
@@ -407,8 +416,8 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
 
                 <Animated.View style={{ transform: [{ translateX: step2X }], position: "absolute", top: 0, width: "100%" }}>
                   <CustomInput
-                    label="Nama Lengkap"
-                    placeholder="Masukkan nama lengkap Anda"
+                    label={t('auth.name_label') || "Nama Lengkap"}
+                    placeholder={t('auth.name_placeholder') || "Masukkan nama lengkap Anda"}
                     value={name}
                     onChangeText={(text) => {
                       setName(text);
@@ -419,12 +428,14 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     returnKeyType="next"
                     blurOnSubmit={true}
                     error={errors.name}
-                    icon={<MaterialIcons name="person" size={16} color={theme.text.secondary} />}
+                    iconName="person"
+                    isRequired={true}
                   />
-
+ 
                   <View style={styles.selectContainer}>
                     <Text style={[styles.selectLabel, { color: theme.text.secondary }]}>
-                      Program Studi
+                      {t('auth.study_program_label') || "Program Studi"}
+                      <Text style={{ color: Colors.semantic.error.main }}> *</Text>
                     </Text>
                     <TouchableOpacity
                       activeOpacity={0.8}
@@ -444,7 +455,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                           { color: studyProgram ? theme.text.primary : theme.text.placeholder },
                         ]}
                       >
-                        {studyProgram || "Pilih Program Studi"}
+                        {studyProgram || (t('auth.study_program_placeholder') || "Pilih Program Studi")}
                       </Text>
                       <MaterialIcons name="expand-more" size={18} color={theme.text.secondary} />
                     </TouchableOpacity>
@@ -452,11 +463,11 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                       <Text style={styles.errorText}>{errors.studyProgram}</Text>
                     )}
                   </View>
-
+ 
                   <CustomInput
                     ref={phoneRef}
-                    label="Nomor Telepon"
-                    placeholder="Masukkan nomor telepon aktif"
+                    label={t('auth.phone_label') || "Nomor Telepon"}
+                    placeholder={t('auth.phone_placeholder') || "Masukkan nomor telepon aktif"}
                     value={phone}
                     onChangeText={(text) => {
                       setPhone(text);
@@ -468,18 +479,19 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                     returnKeyType="done"
                     blurOnSubmit={true}
                     error={errors.phone}
-                    icon={<MaterialIcons name="phone" size={16} color={theme.text.secondary} />}
+                    iconName="call"
+                    isRequired={true}
                   />
 
                   <View style={styles.step2Buttons}>
                     <CustomButton
-                      title="Kembali"
+                      title={t('auth.back_btn') || "Kembali"}
                       onPress={() => setStep(1)}
                       type="secondary"
                       style={styles.backBtn}
                     />
                     <CustomButton
-                      title="Daftar Sekarang"
+                      title={t('auth.register_now') || "Daftar Sekarang"}
                       onPress={handleRegister}
                       type="primary"
                       loading={loading}
@@ -491,14 +503,14 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
 
               <View style={styles.dividerWrapper}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>atau</Text>
+                <Text style={styles.dividerText}>{t('auth.or') || "atau"}</Text>
                 <View style={styles.dividerLine} />
               </View>
 
               <View style={styles.loginWrapper}>
-                <Text style={styles.loginLabel}>Sudah punya akun?</Text>
+                <Text style={styles.loginLabel}>{t('auth.have_account') || "Sudah punya akun?"}</Text>
                 <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToLogin}>
-                  <Text style={styles.loginLink}>Masuk Sekarang</Text>
+                  <Text style={styles.loginLink}>{t('auth.login_now') || "Masuk Sekarang"}</Text>
                 </TouchableOpacity>
               </View>
             </Panel>
@@ -506,74 +518,21 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal
+      <SelectionModal
         visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: theme.text.heading }]}>
-              Pilih Program Studi
-            </Text>
-
-            <CustomInput
-              placeholder="Cari program studi..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              icon={<MaterialIcons name="search" size={16} color={theme.text.secondary} />}
-              style={{ marginBottom: 12 }}
-            />
-
-            <ScrollView style={styles.modalScroll}>
-              {filteredPrograms.length > 0 ? (
-                filteredPrograms.map((program) => (
-                  <TouchableOpacity
-                    key={program}
-                    activeOpacity={0.7}
-                    style={[styles.modalOption, { borderBottomColor: theme.border }]}
-                    onPress={() => {
-                      setStudyProgram(program);
-                      setModalVisible(false);
-                      setSearchQuery("");
-                      if (errors.studyProgram) {
-                        setErrors((prev) => ({ ...prev, studyProgram: null }));
-                      }
-                    }}
-                  >
-                    <Text style={[styles.optionText, { color: theme.text.primary }]}>
-                      {program}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
-                    Program studi tidak ditemukan
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setModalVisible(false);
-                setSearchQuery("");
-              }}
-              style={styles.cancelBtn}
-            >
-              <Text style={styles.cancelBtnText}>Batal</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setModalVisible(false)}
+        title={t('auth.study_program_title') || "Pilih Program Studi"}
+        options={UNIQUE_STUDY_PROGRAMS.map(prog => ({ id: prog, label: prog }))}
+        onSelect={(selectedOption) => {
+          setStudyProgram(selectedOption.label);
+          setModalVisible(false);
+          if (errors.studyProgram) {
+            setErrors((prev) => ({ ...prev, studyProgram: null }));
+          }
+        }}
+        searchable={true}
+        searchPlaceholder={t('auth.search_study_program') || "Cari program studi..."}
+      />
     </SafeAreaView>
   );
 }
@@ -844,66 +803,6 @@ const getStyles = (theme, isDark) => {
       fontFamily: "Barlow-Bold",
       fontSize: 14,
       color: Colors.primary.blue500,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 24,
-    },
-    modalContent: {
-      borderRadius: 24,
-      borderWidth: 1.5,
-      width: "100%",
-      maxHeight: "80%",
-      padding: 24,
-      overflow: "hidden",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.25,
-      shadowRadius: 15,
-      elevation: 10,
-    },
-    modalTitle: {
-      fontFamily: "Barlow-Bold",
-      fontSize: 18,
-      marginBottom: 16,
-      textAlign: "center",
-    },
-    modalScroll: {
-      marginBottom: 16,
-      maxHeight: 280,
-    },
-    modalOption: {
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      justifyContent: "center",
-    },
-    optionText: {
-      fontFamily: "Barlow-Medium",
-      fontSize: 14,
-    },
-    emptyContainer: {
-      paddingVertical: 24,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    emptyText: {
-      fontFamily: "Barlow-Medium",
-      fontSize: 14,
-    },
-    cancelBtn: {
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: Colors.semantic.error.main,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    cancelBtnText: {
-      fontFamily: "Barlow-Bold",
-      fontSize: 15,
-      color: "#FFFFFF",
-    },
+    }
   });
 };

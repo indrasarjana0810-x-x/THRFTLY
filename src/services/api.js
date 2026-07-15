@@ -2,6 +2,7 @@
    API Client
 ========================================== */
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Config from "./config";
 
 const apiClient = axios.create({
@@ -11,6 +12,24 @@ const apiClient = axios.create({
   },
   timeout: 10000,
 });
+
+/* ---------- Axios Interceptor ---------- */
+apiClient.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (e) {
+      console.log('Error getting token for interceptor', e);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 /* ---------- API Endpoints ---------- */
 
@@ -73,6 +92,121 @@ const api = {
       return response.data;
     },
   },
+  users: {
+    /**
+     * Get Profile
+     * Mengambil data profil user yang sedang login dari token.
+     */
+    getProfile: async () => {
+      const response = await apiClient.get("/profile");
+      return response.data;
+    },
+
+    /**
+     * Update Avatar
+     * Menyimpan URL avatar baru ke database backend.
+     */
+    updateAvatar: async (profileUrl) => {
+      const response = await apiClient.put("/profile/avatar", { profileUrl });
+      return response.data;
+    },
+
+    /**
+     * Update Profile
+     * Memperbarui nama dan telepon pengguna.
+     */
+    updateProfile: async (name, phone) => {
+      const response = await apiClient.put("/profile/update", { name, phone });
+      return response.data;
+    },
+
+    /**
+     * Change Password
+     * Mengubah kata sandi pengguna dari Pusat Akun.
+     */
+    changePassword: async (oldPassword, newPassword, confirmPassword) => {
+      const response = await apiClient.put("/profile/password", {
+        oldPassword,
+        newPassword,
+        confirmPassword
+      });
+      return response.data;
+    }
+  },
+  categories: {
+    /**
+     * Get Active Categories
+     * Mengambil daftar kategori yang aktif untuk form posting dan filter.
+     */
+    getActive: async () => {
+      const response = await apiClient.get("/category");
+      return response.data;
+    }
+  },
+  items: {
+    /**
+     * Create Item
+     * Memposting listing barang baru ke backend.
+     */
+    create: async (itemData) => {
+      const response = await apiClient.post("/item", itemData);
+      return response.data;
+    },
+
+    /**
+     * Get All Items
+     * Mengambil daftar semua barang aktif dengan filter opsional.
+     */
+    getAll: async (params) => {
+      const response = await apiClient.get("/item", { params });
+      return response.data;
+    },
+
+    /**
+     * Get My Items
+     * Mengambil daftar barang milik user yang sedang login.
+     */
+    getMy: async (status) => {
+      const response = await apiClient.get("/item/my", { params: { status } });
+      return response.data;
+    },
+
+    /**
+     * Get Item Detail
+     * Mengambil data lengkap barang berdasarkan ID.
+     */
+    getById: async (id) => {
+      const response = await apiClient.get(`/item/${id}`);
+      return response.data;
+    },
+
+    /**
+     * Update Item
+     * Memperbarui detail informasi barang milik sendiri.
+     */
+    update: async (id, itemData) => {
+      const response = await apiClient.put(`/item/${id}`, itemData);
+      return response.data;
+    },
+
+    /**
+     * Update Item Status
+     * Mengubah status jualan barang (Available, Booked, Sold).
+     */
+    updateStatus: async (id, status) => {
+      const response = await apiClient.put(`/item/${id}/status`, { status });
+      return response.data;
+    },
+
+    /**
+     * Delete Item
+     * Menghapus listing barang milik sendiri dari server.
+     */
+    delete: async (id) => {
+      const response = await apiClient.delete(`/item/${id}`);
+      return response.data;
+    }
+  }
 };
 
 export default api;

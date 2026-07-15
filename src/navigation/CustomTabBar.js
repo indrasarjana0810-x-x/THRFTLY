@@ -7,8 +7,9 @@ import { View, TouchableOpacity, StyleSheet, Dimensions, useColorScheme, Animate
 import Svg, { Path } from 'react-native-svg';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
+import { useLanguage } from '../localization/LanguageContext';
 
 /* ---------- Geometry Helpers ---------- */
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -45,6 +46,7 @@ const getNavBarPath = (width, height, radius, notchRadius, notchCenterX) => {
  * CustomTabBar
  */
 export default function CustomTabBar({ state, descriptors, navigation }) {
+  const { t } = useLanguage();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
@@ -57,22 +59,22 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
     NAV_BAR_WIDTH / 2
   );
 
-  const getIconName = (routeName) => {
+  const getIconName = (routeName, isFocused) => {
     switch (routeName) {
-      case 'HomeTab': return 'home';
-      case 'SearchTab': return 'search';
-      case 'BookmarksTab': return 'bookmark';
-      case 'ProfileTab': return 'person';
-      default: return 'circle';
+      case 'HomeTab': return isFocused ? 'home' : 'home-outline';
+      case 'SearchTab': return isFocused ? 'search' : 'search-outline';
+      case 'WishlistTab': return isFocused ? 'bookmark' : 'bookmark-outline';
+      case 'ProfileTab': return isFocused ? 'person' : 'person-outline';
+      default: return 'ellipse';
     }
   };
 
   const getLabel = (routeName) => {
     switch (routeName) {
-      case 'HomeTab': return 'Beranda';
-      case 'SearchTab': return 'Cari';
-      case 'BookmarksTab': return 'Disimpan';
-      case 'ProfileTab': return 'Profil';
+      case 'HomeTab': return t('nav.home') || 'Beranda';
+      case 'SearchTab': return t('nav.search') || 'Cari';
+      case 'WishlistTab': return t('nav.wishlist') || 'Wishlist';
+      case 'ProfileTab': return t('nav.profile') || 'Profil';
       default: return 'Menu';
     }
   };
@@ -130,7 +132,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
                   key={route.key}
                   isFocused={isFocused}
                   onPress={onPress}
-                  iconName={getIconName(route.name)}
+                  iconName={getIconName(route.name, isFocused)}
                   label={getLabel(route.name)}
                   isDark={isDark}
                   theme={theme}
@@ -144,7 +146,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
               key={route.key}
               isFocused={isFocused}
               onPress={onPress}
-              iconName={getIconName(route.name)}
+              iconName={getIconName(route.name, isFocused)}
               label={getLabel(route.name)}
               isDark={isDark}
               theme={theme}
@@ -153,7 +155,11 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
         })}
       </View>
 
-      <TouchableOpacity activeOpacity={0.8} style={styles.floatingButton}>
+      <TouchableOpacity 
+        activeOpacity={0.8} 
+        style={styles.floatingButton}
+        onPress={() => navigation.navigate('PostItem')}
+      >
         <MaterialIcons name="add" size={32} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
@@ -192,7 +198,7 @@ const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, isDark, them
       activeOpacity={0.8}
     >
       <Animated.View style={{ transform: [{ translateY: iconTranslateY }], alignItems: 'center' }}>
-        <MaterialIcons name={iconName} size={24} color={iconColor} />
+        <Ionicons name={iconName} size={24} color={iconColor} />
       </Animated.View>
       
       <Animated.View
@@ -203,7 +209,7 @@ const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, isDark, them
           transform: [{ translateY: textTranslateY }],
         }}
       >
-        <Animated.Text style={[styles.navItemLabel, { color: activeColor }]}>
+        <Animated.Text style={[styles.navItemLabel, { color: activeColor }]} numberOfLines={1} adjustsFontSizeToFit>
           {label}
         </Animated.Text>
       </Animated.View>
@@ -220,10 +226,10 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowRadius: 20,
+    elevation: 24,
   },
   bottomNav: {
     position: 'absolute',
@@ -237,7 +243,7 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 48,
+    width: 56,
     height: '100%',
   },
   navItemLabel: {
@@ -260,10 +266,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: Colors.primary.blue500,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 12,
   },
   activeIndicator: {
     position: 'absolute',

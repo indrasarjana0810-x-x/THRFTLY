@@ -36,13 +36,12 @@ const getStyles = (theme, isDark, shadow) => {
       borderWidth: 1.5,
       borderColor: theme.border,
       padding: 24,
-      // Bayangan premium jika shadow diset true
       ...(shadow && {
-        shadowColor: shadowColor,
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: shadowOpacity,
-        shadowRadius: 20,
-        elevation: 12, // Fallback untuk Android
+        shadowColor: Colors.primary.blue500,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.15 : 0.06,
+        shadowRadius: 10,
+        elevation: 4,
       }),
     },
   });

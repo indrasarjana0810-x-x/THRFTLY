@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": " ",
+    "name": "",
     "slug": "THRIFTLY",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon_new.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -12,10 +12,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive_icon_new.png",
+        "foregroundImage": "./assets/adaptive_icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.THRIFTLY"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -25,13 +30,20 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash_icon_new.png",
+          "image": "./assets/splash_icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "image": "./assets/splash_icon_new.png",
+            "image": "./assets/splash_icon.png",
             "backgroundColor": "#0A0A0A"
           }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikasi butuh akses galeri foto untuk mengunggah foto profil dan foto produk.",
+          "cameraPermission": "Aplikasi butuh akses kamera untuk mengambil foto produk secara langsung."
         }
       ]
     ]

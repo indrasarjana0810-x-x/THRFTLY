@@ -14,7 +14,7 @@ import {
   StyleSheet,
   useColorScheme,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/colors";
 
 const CustomInput = forwardRef(
@@ -24,8 +24,9 @@ const CustomInput = forwardRef(
       placeholder,
       value,
       onChangeText,
-      icon,
+      iconName,
       isPassword = false,
+      isRequired = false,
       error,
       keyboardType = "default",
       autoCapitalize = "none",
@@ -33,8 +34,13 @@ const CustomInput = forwardRef(
       returnKeyType = "default",
       blurOnSubmit = true,
       onSubmitEditing,
+      leftComponent,
+      rightComponent,
       style,
       inputStyle,
+      wrapperStyle,
+      onFocus,
+      onBlur,
       ...props
     },
     ref,
@@ -74,7 +80,8 @@ const CustomInput = forwardRef(
       isFocused && {
         borderColor: error ? Colors.semantic.error.main : Colors.primary.blue500,
         backgroundColor: theme.surface,
-      }
+      },
+      wrapperStyle
     ];
 
     const textInputStyle = [
@@ -85,10 +92,25 @@ const CustomInput = forwardRef(
 
     return (
       <View style={[styles.container, style]}>
-        {label && <Text style={labelStyle}>{label}</Text>}
+        {label && (
+          <Text style={labelStyle}>
+            {label}
+            {isRequired && <Text style={{ color: Colors.semantic.error.main }}> *</Text>}
+          </Text>
+        )}
 
         <View style={inputWrapperStyle}>
-          {icon && <View style={styles.inputIconWrapper}>{icon}</View>}
+          {leftComponent ? (
+            leftComponent
+          ) : iconName ? (
+            <View style={styles.inputIconWrapper}>
+              <Ionicons 
+                name={isFocused ? iconName : `${iconName}-outline`} 
+                size={18} 
+                color={isFocused ? Colors.primary.blue500 : theme.text.secondary} 
+              />
+            </View>
+          ) : null}
 
           <TextInput
             ref={inputRef} // <-- PAKE REF INTERNAL
@@ -105,24 +127,31 @@ const CustomInput = forwardRef(
             returnKeyType={returnKeyType}
             blurOnSubmit={blurOnSubmit}
             onSubmitEditing={onSubmitEditing}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
+            onFocus={(e) => {
+              setIsFocused(true);
+              if (onFocus) onFocus(e);
+            }}
+            onBlur={(e) => {
+              setIsFocused(false);
+              if (onBlur) onBlur(e);
+            }}
             {...props}
           />
 
-          {isPassword && (
-            <TouchableOpacity
-              style={styles.eyeBtn}
+          {rightComponent ? (
+            rightComponent
+          ) : isPassword ? (
+            <TouchableOpacity 
               onPress={() => setShowPassword(!showPassword)}
-              activeOpacity={0.7}
+              style={styles.eyeBtn}
             >
-              <MaterialIcons
-                name={showPassword ? "visibility" : "visibility-off"}
-                size={18}
-                color={theme.text.secondary}
+              <MaterialIcons 
+                name={showPassword ? "visibility" : "visibility-off"} 
+                size={20} 
+                color={theme.text.secondary} 
               />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
@@ -150,7 +179,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     paddingHorizontal: 14,
-    height: 48,
+    minHeight: 48, // ubah dari height ke minHeight supaya bisa membesar kalau multiline
+    paddingVertical: 12, // tambahkan padding biar text area rapi
   },
   inputIconWrapper: {
     marginRight: 10,
@@ -161,7 +191,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: "Barlow-Medium",
     fontSize: 14,
-    height: "100%",
+    minHeight: 24, // ubah dari height: '100%' ke minHeight supaya flexbox ga aneh di multiline
     padding: 0,
   },
   eyeBtn: {

@@ -1,34 +1,42 @@
-// src/screens/HomeScreen.js
+/* ==========================================
+   HomeScreen Component
+========================================== */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Platform,
   useColorScheme,
   FlatList,
   Dimensions,
   Animated,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import { selectAuthUser } from '../store/slices/authSlice';
 import Colors from '../constants/colors';
 import ProductCard from '../components/ProductCard';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useLanguage } from '../localization/LanguageContext';
+import api from '../services/api';
 
-/* =====================================================================
-   DUMMY DATA (Khusus Mahasiswa)
-===================================================================== */
+/* ==========================================
+   Dummy Data (Khusus Mahasiswa)
+========================================== */
 
 const QUICK_MENUS = [
-  { id: '1', label: 'Terdekat', icon: 'map-marker-radius', color: Colors.semantic.success.main, bgLight: 'rgba(34, 197, 94, 0.08)', bgDark: 'rgba(34, 197, 94, 0.12)' },
-  { id: '2', label: 'Bisa COD', icon: 'handshake-outline', color: Colors.primary.blue500, bgLight: 'rgba(56, 182, 255, 0.08)', bgDark: 'rgba(56, 182, 255, 0.12)' },
-  { id: '3', label: 'Cuci Gudang', icon: 'package-variant', color: Colors.primary.yellow500, bgLight: 'rgba(255, 214, 0, 0.12)', bgDark: 'rgba(255, 214, 0, 0.15)' },
-  { id: '4', label: 'Lulusan', icon: 'school-outline', color: Colors.semantic.error.main, bgLight: 'rgba(239, 68, 68, 0.08)', bgDark: 'rgba(239, 68, 68, 0.12)' },
+  { id: '1', key: 'home.promo', icon: 'location-outline', color: Colors.semantic.success.main, bgLight: 'rgba(34, 197, 94, 0.08)', bgDark: 'rgba(34, 197, 94, 0.12)' },
+  { id: '2', key: 'home.new_arrival', icon: 'people-outline', color: Colors.primary.blue500, bgLight: 'rgba(56, 182, 255, 0.08)', bgDark: 'rgba(56, 182, 255, 0.12)' },
+  { id: '3', key: 'home.favorite', icon: 'cube-outline', color: Colors.primary.yellow500, bgLight: 'rgba(255, 214, 0, 0.12)', bgDark: 'rgba(255, 214, 0, 0.15)' },
+  { id: '4', key: 'home.graduate', icon: 'school-outline', color: Colors.semantic.error.main, bgLight: 'rgba(239, 68, 68, 0.08)', bgDark: 'rgba(239, 68, 68, 0.12)' },
 ];
 
 const HERO_BANNERS = [
@@ -58,16 +66,18 @@ const HERO_BANNERS = [
   },
 ];
 
-const INFINITE_BANNERS = Array(100).fill(HERO_BANNERS).flat().map((item, index) => ({
+const INFINITE_BANNERS = Array(3).fill(HERO_BANNERS).flat().map((item, index) => ({
   ...item,
   infiniteId: String(index),
 }));
+// Start index di tengah (index HERO_BANNERS.length = 3)
+const INITIAL_BANNER_INDEX = HERO_BANNERS.length;
 
 const LATEST_ITEMS = [
   {
     id: '1',
     title: 'Buku Kalkulus Purcell Ed. 9',
-    price: 'Rp 150.000',
+    price: 150000,
     condition: 'Baik',
     location: '1.5km',
     status: 'Available',
@@ -77,7 +87,7 @@ const LATEST_ITEMS = [
   {
     id: '2',
     title: 'Kemeja Flanel Uniqlo Size L',
-    price: 'Rp 80.000',
+    price: 80000,
     condition: 'Seperti Baru',
     location: '800m',
     status: 'Available',
@@ -87,7 +97,7 @@ const LATEST_ITEMS = [
   {
     id: '3',
     title: 'Monitor PC LG 19 inch (Buat Skripsi)',
-    price: 'Rp 400.000',
+    price: 400000,
     condition: 'Baik',
     location: 'COD Area Kos',
     status: 'Available',
@@ -97,7 +107,7 @@ const LATEST_ITEMS = [
   {
     id: '4',
     title: 'Mouse Wireless Logitech M170',
-    price: 'Rp 65.000',
+    price: 65000,
     condition: 'Sangat Baik',
     location: '2.1km',
     status: 'Booked',
@@ -106,22 +116,63 @@ const LATEST_ITEMS = [
   },
 ];
 
-/* =====================================================================
-   MAIN SCREEN COMPONENT
-===================================================================== */
-
-export default function HomeScreen({ onLogout }) {
+/* ==========================================
+   Main Screen Component
+========================================== */
+/**
+ * HomeScreen
+ * Halaman beranda utama aplikasi.
+ * Menampilkan hero banner, menu cepat, dan daftar produk terpopuler.
+ */
+export default function HomeScreen({ navigation, onLogout }) {
+  const user = useSelector(selectAuthUser);
+  const { t } = useLanguage();
   const [favorites, setFavorites] = useState([]);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Filter out the logged-in user's own items from the feed
+  const filteredItems = useMemo(() => {
+    if (!user) return items;
+    return items.filter(
+      (item) => item.sellerId !== user.idUser && item.sellerId !== user.nim
+    );
+  }, [items, user]);
+
+  // W4 - useCallback: stabilkan referensi loadItems agar tidak dibuat ulang tiap render
+  const loadItems = useCallback(async () => {
+    try {
+      const res = await api.items.getAll();
+      if (res && res.status === "200" && res.items) {
+        setItems(res.items);
+      }
+    } catch (error) {
+      console.log("Error loading items on HomeScreen:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadItems();
+  };
 
   const flatListRef = useRef(null);
-  const currentIndexRef = useRef(HERO_BANNERS.length * 50); // Mulai di tengah array (index 150)
+  const currentIndexRef = useRef(INITIAL_BANNER_INDEX);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const interval = setInterval(() => {
       // NOTE: Mengembalikan index ke posisi tengah jika mencapai akhir array
       if (currentIndexRef.current >= INFINITE_BANNERS.length - 1) {
-        currentIndexRef.current = HERO_BANNERS.length * 50;
+        currentIndexRef.current = INITIAL_BANNER_INDEX;
         if (flatListRef.current) {
           flatListRef.current.scrollToIndex({ index: currentIndexRef.current, animated: false });
         }
@@ -145,16 +196,14 @@ export default function HomeScreen({ onLogout }) {
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
 
-  // Buat style dinamis berdasarkan tema
-  const styles = getStyles(theme, isDark);
+  // W4 - useMemo: hitung styles sekali, tidak ulang tiap render kecuali tema berubah
+  const styles = useMemo(() => getStyles(theme, isDark), [isDark]);
 
-  const toggleFavorite = (id) => {
-    if (favorites.includes(id)) {
-      setFavorites(favorites.filter((favId) => favId !== id));
-    } else {
-      setFavorites([...favorites, id]);
-    }
-  };
+  const toggleFavorite = useCallback((id) => {
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
+    );
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -173,8 +222,8 @@ export default function HomeScreen({ onLogout }) {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.iconButton}>
-            <MaterialIcons
-              name="notifications-none"
+            <Ionicons
+              name="notifications-outline"
               size={24}
               color={isDark ? '#FFFFFF' : Colors.primary.blue500}
             />
@@ -182,7 +231,7 @@ export default function HomeScreen({ onLogout }) {
             <View style={styles.notificationDot} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons
+            <Ionicons
               name="cart-outline"
               size={24}
               color={isDark ? '#FFFFFF' : Colors.primary.blue500}
@@ -195,6 +244,14 @@ export default function HomeScreen({ onLogout }) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary.blue500]}
+            tintColor={Colors.primary.blue500}
+          />
+        }
       >
         {/* 2. Hero Banner Carousel */}
         <View style={styles.heroCardContainer}>
@@ -206,7 +263,7 @@ export default function HomeScreen({ onLogout }) {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.infiniteId}
-              initialScrollIndex={HERO_BANNERS.length * 50}
+              initialScrollIndex={INITIAL_BANNER_INDEX}
               getItemLayout={(data, index) => ({
                 length: Dimensions.get('window').width - 48,
                 offset: (Dimensions.get('window').width - 48) * index,
@@ -305,46 +362,76 @@ export default function HomeScreen({ onLogout }) {
 
         {/* 3. Quick Menus (Pengganti Kategori) */}
         <View style={styles.quickMenuContainer}>
-          {QUICK_MENUS.map((menu) => (
-            <TouchableOpacity key={menu.id} style={styles.quickMenuItem} activeOpacity={0.7}>
-              <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? menu.bgDark : menu.bgLight }]}>
-                <MaterialCommunityIcons name={menu.icon} size={28} color={menu.color} />
-              </View>
-              <Text style={styles.quickMenuLabel}>{menu.label}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
+            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[0].bgDark : QUICK_MENUS[0].bgLight }]}>
+              <Ionicons name={QUICK_MENUS[0].icon} size={28} color={QUICK_MENUS[0].color} />
+            </View>
+            <Text style={styles.quickMenuLabel}>{t('home.promo') || QUICK_MENUS[0].label}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
+            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[1].bgDark : QUICK_MENUS[1].bgLight }]}>
+              <Ionicons name={QUICK_MENUS[1].icon} size={28} color={QUICK_MENUS[1].color} />
+            </View>
+            <Text style={styles.quickMenuLabel}>{t('home.new_arrival') || QUICK_MENUS[1].label}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
+            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[2].bgDark : QUICK_MENUS[2].bgLight }]}>
+              <Ionicons name={QUICK_MENUS[2].icon} size={28} color={QUICK_MENUS[2].color} />
+            </View>
+            <Text style={styles.quickMenuLabel}>{t('home.favorite') || QUICK_MENUS[2].label}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
+            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[3].bgDark : QUICK_MENUS[3].bgLight }]}>
+              <Ionicons name={QUICK_MENUS[3].icon} size={28} color={QUICK_MENUS[3].color} />
+            </View>
+            <Text style={styles.quickMenuLabel}>{t('home.graduate') || QUICK_MENUS[3].label}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 4. Main Feed: Terbaru / For You (Masonry) */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Rekomendasi</Text>
+          <Text style={styles.sectionTitle}>{t('home.recommended') || 'Rekomendasi'}</Text>
         </View>
-        <View style={styles.masonryContainer}>
-          <View style={styles.masonryColumn}>
-            {LATEST_ITEMS.filter((_, i) => i % 2 === 0).map((item) => (
-              <ProductCard
-                key={item.id}
-                item={item}
-                isFavorite={favorites.includes(item.id)}
-                layout="masonry"
-                onFavoritePress={() => toggleFavorite(item.id)}
-                style={{ marginBottom: 16 }}
-              />
-            ))}
+        {loading ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.primary.blue500} />
           </View>
-          <View style={styles.masonryColumn}>
-            {LATEST_ITEMS.filter((_, i) => i % 2 !== 0).map((item) => (
-              <ProductCard
-                key={item.id}
-                item={item}
-                isFavorite={favorites.includes(item.id)}
-                layout="masonry"
-                onFavoritePress={() => toggleFavorite(item.id)}
-                style={{ marginBottom: 16 }}
-              />
-            ))}
+        ) : filteredItems.length === 0 ? (
+          <View style={{ paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontFamily: 'Barlow-Medium', color: theme.text.secondary, textAlign: 'center' }}>
+              Belum ada rekomendasi barang dari pengguna lain
+            </Text>
           </View>
-        </View>
+        ) : (
+          <View style={styles.masonryContainer}>
+            <View style={styles.masonryColumn}>
+              {filteredItems.filter((_, i) => i % 2 === 0).map((item) => (
+                <ProductCard
+                  key={item.idItem || item.id}
+                  item={item}
+                  isFavorite={favorites.includes(item.idItem || item.id)}
+                  layout="masonry"
+                  onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
+                  onFavoritePress={() => toggleFavorite(item.idItem || item.id)}
+                  style={{ marginBottom: 16 }}
+                />
+              ))}
+            </View>
+            <View style={styles.masonryColumn}>
+              {filteredItems.filter((_, i) => i % 2 !== 0).map((item) => (
+                <ProductCard
+                  key={item.idItem || item.id}
+                  item={item}
+                  isFavorite={favorites.includes(item.idItem || item.id)}
+                  layout="masonry"
+                  onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
+                  onFavoritePress={() => toggleFavorite(item.idItem || item.id)}
+                  style={{ marginBottom: 16 }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Jarak pemisah untuk menghindari tertutup bottom nav */}
         <View style={{ height: 120 }} />
@@ -353,9 +440,9 @@ export default function HomeScreen({ onLogout }) {
   );
 }
 
-/* =====================================================================
-   STYLES
-===================================================================== */
+/* ==========================================
+   Styles
+========================================== */
 
 const getStyles = (theme, isDark) => {
   return StyleSheet.create({

@@ -3,26 +3,36 @@
 ========================================== */
 /* ---------- Imports ---------- */
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import Colors from '../constants/colors';
 
 /**
  * Avatar
  * Menampilkan gambar profil bulat. Jika image kosong, menampilkan huruf pertama (inisial).
+ * W4 - React.memo: mencegah re-render jika props tidak berubah
  */
-export default function Avatar({ imageUrl, name = "?", size = 48 }) {
+const Avatar = React.memo(function Avatar({ imageUrl, name = "?", size = 48 }) {
   const initial = name ? name.charAt(0).toUpperCase() : "?";
 
   return (
     <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
       {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} />
+        <Image 
+          source={{ uri: imageUrl }} 
+          style={styles.image}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
+        />
       ) : (
         <Text style={[styles.initial, { fontSize: size * 0.4 }]}>{initial}</Text>
       )}
     </View>
   );
-}
+});
+
+export default Avatar;
 
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({
@@ -35,7 +45,6 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   initial: {
     fontFamily: 'Barlow-Bold',

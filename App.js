@@ -1,9 +1,8 @@
 /* ==========================================
    Root Application Component
 ========================================== */
-import React, { useState } from 'react';
-import { ActivityIndicator, View, StyleSheet, useColorScheme } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from 'react';
+import { ActivityIndicator, View, StyleSheet, useColorScheme, StatusBar } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -15,24 +14,67 @@ import {
   Barlow_900Black,
 } from '@expo-google-fonts/barlow';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
+import AccountCenterScreen from './src/screens/AccountCenterScreen';
+import MyItemsScreen from './src/screens/MyItemsScreen';
+import PostItemScreen from './src/screens/PostItemScreen';
+import DetailScreen from './src/screens/DetailScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import Colors from './src/constants/colors';
 import { ToastProvider } from './src/components/Toast';
 import SplashScreen from './src/screens/SplashScreen';
+import { Provider, useDispatch, useSelector } from 'react-redux';
+import { store } from './src/store/store';
+import { selectIsAuthenticated, setCredentials, logout } from './src/store/slices/authSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LanguageProvider } from './src/localization/LanguageContext';
+import api from './src/services/api';
 
 const Stack = createNativeStackNavigator();
 
 /**
- * App
- * Komponen akar (root) yang mengatur Navigation Container, Tema (Dark/Light), 
- * dan Splash Screen overlay.
+ * AppContent
+ * Menangani navigasi dan logika otentikasi
  */
-export default function App() {
+function AppContent() {
   /* ---------- Component States ---------- */
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const isLoggedIn = useSelector(selectIsAuthenticated);
+  const dispatch = useDispatch();
   const [showSplash, setShowSplash] = useState(true);
+
+  /* ---------- Auto Login Check ---------- */
+  useEffect(() => {
+    const checkLogin = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token) {
+          try {
+            // Ambil data profil dari backend menggunakan token yang ada di AsyncStorage
+            const profileResponse = await api.users.getProfile();
+            const userProfile = {
+              nim: profileResponse.idUser,
+              idUser: profileResponse.idUser,
+              name: profileResponse.name,
+              email: profileResponse.email,
+              phone: profileResponse.phone,
+              studyProgram: profileResponse.studyProgram,
+              profileUrl: profileResponse.profileUrl,
+              role: profileResponse.role,
+            };
+            dispatch(setCredentials({ token, user: userProfile }));
+          } catch (apiError) {
+            console.log("Token expired atau error mengambil profil:", apiError);
+            await AsyncStorage.removeItem('userToken');
+            dispatch(logout());
+          }
+        }
+      } catch (e) {
+        console.log("Gagal cek token", e);
+      }
+    };
+    checkLogin();
+  }, [dispatch]);
 
   /* ---------- Theme & Assets ---------- */
   const colorScheme = useColorScheme();
@@ -77,14 +119,19 @@ export default function App() {
             }}
           >
             {isLoggedIn ? (
-              <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              <>
+                <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+                <Stack.Screen name="AccountCenter" component={AccountCenterScreen} />
+                <Stack.Screen name="MyItems" component={MyItemsScreen} />
+                <Stack.Screen name="PostItem" component={PostItemScreen} />
+                <Stack.Screen name="Detail" component={DetailScreen} />
+              </>
             ) : (
               <>
                 <Stack.Screen name="Login">
                   {(props) => (
                     <LoginScreen
                       {...props}
-                      onLogin={() => setIsLoggedIn(true)}
                       onNavigateToRegister={() => props.navigation.navigate('Register')}
                       onNavigateToForgotPassword={() => props.navigation.navigate('ForgotPassword')}
                     />
@@ -116,6 +163,20 @@ export default function App() {
         )}
       </View>
     </ToastProvider>
+  );
+}
+
+/**
+ * App
+ * Komponen akar (root) yang mengatur Provider Redux.
+ */
+export default function App() {
+  return (
+    <Provider store={store}>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </Provider>
   );
 }
 

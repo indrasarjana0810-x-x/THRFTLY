@@ -9,6 +9,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import Colors from '../constants/colors';
+import { Shadows } from '../constants/styles';
 
 export default function CustomButton({
   title,
@@ -124,11 +125,7 @@ const getStyles = (theme, isDark) => {
     /* Types */
     primary: {
       backgroundColor: Colors.primary.blue500,
-      shadowColor: Colors.primary.blue500,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.35 : 0.2,
-      shadowRadius: 8,
-      elevation: 4,
+      ...Shadows.primary,
     },
     secondary: {
       backgroundColor: isDark ? '#222235' : '#F3F4F6',

@@ -8,7 +8,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Platform,
   ScrollView,
@@ -17,7 +16,9 @@ import {
   Keyboard,
   Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Colors from "../../constants/colors";
+import { Shadows } from "../../constants/styles";
 import ThriftlyLogo from "../../components/ThriftlyLogo";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
@@ -26,15 +27,21 @@ import Panel from "../../components/Panel";
 import { MaterialIcons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useToast } from "../../components/Toast";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useDispatch } from "react-redux";
+import { useLanguage } from "../../localization/LanguageContext";
+import { setCredentials } from "../../store/slices/authSlice";
 
 /**
  * LoginScreen
  * Halaman autentikasi utama aplikasi.
  * Menangani login mahasiswa menggunakan NIM dan Kata Sandi.
  */
-export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateToForgotPassword }) {
+export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPassword }) {
   /* ---------- Component States & Refs ---------- */
   const { showToast } = useToast();
+  const { t } = useLanguage();
+  const dispatch = useDispatch();
   const [nim, setNim] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
@@ -90,10 +97,10 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
     let localErrors = {};
 
     if (!nim.trim()) {
-      localErrors.nim = "NIM atau Email wajib diisi";
+      localErrors.nim = t('auth.nim_email_required') || "NIM atau Email wajib diisi";
     }
     if (!password) {
-      localErrors.password = "Kata sandi wajib diisi";
+      localErrors.password = t('auth.password_required') || "Kata sandi wajib diisi";
     }
 
     if (Object.keys(localErrors).length > 0) {
@@ -106,19 +113,44 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
     try {
       const data = await api.auth.login(nim.trim(), password);
 
-      if (data.status === "SUCCESS") {
-        showToast("Login Berhasil!", "success");
-        if (onLogin) {
-          onLogin(data.data);
+      if (data.status === "SUCCESS" && data.token) {
+        // Simpan token di AsyncStorage
+        await AsyncStorage.setItem("userToken", data.token);
+        
+        // Coba narik data profil dari backend (karena tokennya udah bisa dipake lewat interceptor)
+        let userProfile = null;
+        try {
+          // Temporarily set token in API headers just for this request since interceptor
+          // might not immediately have the token if AsyncStorage takes a split second
+          const profileResponse = await api.users.getProfile();
+          if (profileResponse.status === "200") {
+            userProfile = {
+              nim: profileResponse.idUser,
+              idUser: profileResponse.idUser,
+              name: profileResponse.name,
+              email: profileResponse.email,
+              phone: profileResponse.phone,
+              studyProgram: profileResponse.studyProgram,
+              profileUrl: profileResponse.profileUrl,
+              role: profileResponse.role,
+            };
+          }
+        } catch (profileErr) {
+          console.log("Failed to fetch profile after login", profileErr);
         }
+
+        dispatch(setCredentials({ token: data.token, user: userProfile }));
       } else {
-        showToast(data.message || "Gagal masuk. NIM/Email atau sandi salah.", "danger");
+        const serverMsg = data.message;
+        const translatedMsg = t(`api.${serverMsg}`) || t('auth.login_failed_credential') || "Gagal masuk. NIM/Email atau sandi salah.";
+        showToast(translatedMsg, "danger");
       }
     } catch (err) {
       console.log(err);
-      let errMsg = "Gagal terhubung ke server Spring Boot Anda.";
+      let errMsg = t('auth.server_error') || "Gagal terhubung ke server Spring Boot Anda.";
       if (err.response && err.response.data) {
-        errMsg = err.response.data.message || err.response.data.error || errMsg;
+        let rawCode = err.response.data.message || err.response.data.error;
+        errMsg = t(`api.${rawCode}`) || rawCode || errMsg;
       }
       showToast(errMsg, "danger");
     } finally {
@@ -171,8 +203,8 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
               </CustomText>
 
               <CustomInput
-                label="NIM atau Email AstraTech"
-                placeholder="NIM / Email AstraTech"
+                label={t('auth.nim_email_label') || "NIM atau Email AstraTech"}
+                placeholder={t('auth.nim_email_placeholder') || "NIM / Email AstraTech"}
                 value={nim}
                 onChangeText={(text) => {
                   setNim(text);
@@ -189,15 +221,14 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
                   }, 100);
                 }}
                 error={errors.nim}
-                icon={
-                  <MaterialIcons name="person" size={16} color={theme.text.secondary} />
-                }
+                iconName="person"
+                isRequired={true}
               />
 
               <CustomInput
                 ref={passwordRef}
-                label="Kata Sandi"
-                placeholder="Masukkan kata sandi"
+                label={t('auth.password_label') || "Kata Sandi"}
+                placeholder={t('auth.password_placeholder') || "Masukkan kata sandi"}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -210,9 +241,8 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
                 blurOnSubmit={true}
                 onSubmitEditing={() => Keyboard.dismiss()}
                 error={errors.password}
-                icon={
-                  <MaterialIcons name="lock" size={16} color={theme.text.secondary} />
-                }
+                iconName="lock-closed"
+                isRequired={true}
               />
 
               <TouchableOpacity
@@ -220,11 +250,11 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
                 activeOpacity={0.7}
                 onPress={onNavigateToForgotPassword}
               >
-                <Text style={styles.forgotText}>Lupa Kata Sandi?</Text>
+                <Text style={styles.forgotText}>{t('auth.forgot_password') || "Lupa Kata Sandi?"}</Text>
               </TouchableOpacity>
 
               <CustomButton
-                title="Masuk"
+                title={t('auth.login_btn') || "Masuk"}
                 onPress={handleLogin}
                 type="primary"
                 loading={loading}
@@ -233,14 +263,14 @@ export default function LoginScreen({ onLogin, onNavigateToRegister, onNavigateT
 
               <View style={styles.dividerWrapper}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>atau</Text>
+                <Text style={styles.dividerText}>{t('auth.or') || "atau"}</Text>
                 <View style={styles.dividerLine} />
               </View>
 
               <View style={styles.registerWrapper}>
-                <Text style={styles.registerLabel}>Belum punya akun?</Text>
+                <Text style={styles.registerLabel}>{t('auth.no_account') || "Belum punya akun?"}</Text>
                 <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToRegister}>
-                  <Text style={styles.registerLink}>Daftar Sekarang</Text>
+                  <Text style={styles.registerLink}>{t('auth.register_now') || "Daftar Sekarang"}</Text>
                 </TouchableOpacity>
               </View>
             </Panel>
@@ -355,11 +385,7 @@ const getStyles = (theme, isDark) => {
     },
     submitBtn: {
       width: "100%",
-      shadowColor: Colors.primary.blue500,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.35 : 0.2,
-      shadowRadius: 8,
-      elevation: 4,
+      ...Shadows.primary,
     },
     dividerWrapper: {
       flexDirection: "row",
