@@ -19,8 +19,9 @@ import { Shadows } from '../constants/styles';
  * 
  * @param {boolean} value - Nilai status toggle (aktif / tidak aktif)
  * @param {function} onValueChange - Handler callback saat nilai diubah
+ * @param {string} activeColor - Warna saat toggle aktif (opsional)
  */
-export default function CustomToggle({ value, onValueChange }) {
+export default function CustomToggle({ value, onValueChange, activeColor = Colors.primary.blue500 }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
@@ -42,7 +43,7 @@ export default function CustomToggle({ value, onValueChange }) {
   });
   const bgInterpolate = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [theme.border, Colors.primary.blue500],
+    outputRange: [theme.border, activeColor],
   });
 
   return (
@@ -75,6 +76,6 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FFF',
+    backgroundColor: Colors.light.surface,
   },
 });

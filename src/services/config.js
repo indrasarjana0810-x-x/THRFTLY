@@ -1,5 +1,5 @@
 /* ==========================================
-   API Configuration
+   Konfigurasi API
 ========================================== */
 import Constants from 'expo-constants';
 import { NativeModules } from 'react-native';

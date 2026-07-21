@@ -11,7 +11,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
 import { useLanguage } from '../localization/LanguageContext';
 
-/* ---------- Geometry Helpers ---------- */
+/* ---------- Bantuan Geometri ---------- */
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const NAV_BAR_WIDTH = SCREEN_WIDTH * 0.88;
 const NAV_BAR_HEIGHT = 64;
@@ -44,9 +44,10 @@ const getNavBarPath = (width, height, radius, notchRadius, notchCenterX) => {
 
 /**
  * CustomTabBar
+ * Komponen navigasi bawah kustom dengan efek blur dan tombol FAB di tengah.
  */
 export default function CustomTabBar({ state, descriptors, navigation }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
@@ -63,7 +64,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
     switch (routeName) {
       case 'HomeTab': return isFocused ? 'home' : 'home-outline';
       case 'SearchTab': return isFocused ? 'search' : 'search-outline';
-      case 'WishlistTab': return isFocused ? 'bookmark' : 'bookmark-outline';
+      case 'CartTab': return isFocused ? 'cart' : 'cart-outline';
       case 'ProfileTab': return isFocused ? 'person' : 'person-outline';
       default: return 'ellipse';
     }
@@ -73,13 +74,13 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
     switch (routeName) {
       case 'HomeTab': return t('nav.home') || 'Beranda';
       case 'SearchTab': return t('nav.search') || 'Cari';
-      case 'WishlistTab': return t('nav.wishlist') || 'Wishlist';
+      case 'CartTab': return t('nav.cart') || (locale === 'id' ? 'Keranjang' : 'Cart');
       case 'ProfileTab': return t('nav.profile') || 'Profil';
       default: return 'Menu';
     }
   };
 
-  const shadowColor = isDark ? '#000000' : Colors.primary.blue500;
+  const shadowColor = isDark ? Colors.common.black : Colors.primary.blue500;
 
   return (
     <View style={[styles.bottomNavContainer, { shadowColor }]}>
@@ -87,7 +88,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
         style={{ width: NAV_BAR_WIDTH, height: NAV_BAR_HEIGHT }}
         maskElement={
           <Svg width={NAV_BAR_WIDTH} height={NAV_BAR_HEIGHT}>
-            <Path d={navBarPath} fill="#000000" />
+            <Path d={navBarPath} fill={Colors.common.black} />
           </Svg>
         }
       >
@@ -120,7 +121,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate({ name: route.name, merge: true });
+              navigation.navigate(route.name);
             }
           };
 
@@ -160,7 +161,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
         style={styles.floatingButton}
         onPress={() => navigation.navigate('PostItem')}
       >
-        <MaterialIcons name="add" size={32} color="#FFFFFF" />
+        <MaterialIcons name="add" size={32} color={Colors.common.white} />
       </TouchableOpacity>
     </View>
   );
@@ -174,21 +175,21 @@ const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, isDark, them
       toValue: isFocused ? 1 : 0,
       friction: 6,
       tension: 60,
-      useNativeDriver: true, // Translasi dan Opacity bisa pakai native driver!
+      useNativeDriver: true, // Translasi dan Opacity mendukung penggunaan native driver
     }).start();
   }, [isFocused]);
 
   const iconTranslateY = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -8], // Icon naik ke atas kalau aktif
+    outputRange: [0, -8], // Ikon bergeser ke atas saat aktif
   });
 
   const textTranslateY = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [15, 0], // Teks meluncur dari bawah ke atas
+    outputRange: [15, 0], // Teks muncul dari arah bawah
   });
 
-  const activeColor = isDark ? '#FFFFFF' : Colors.primary.blue500;
+  const activeColor = isDark ? Colors.common.white : Colors.primary.blue500;
   const iconColor = isFocused ? activeColor : theme.text.placeholder;
 
   return (
@@ -217,7 +218,7 @@ const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, isDark, them
   );
 };
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya Visual ---------- */
 const styles = StyleSheet.create({
   bottomNavContainer: {
     position: 'absolute',

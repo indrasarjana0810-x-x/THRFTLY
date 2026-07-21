@@ -1,14 +1,16 @@
 /* ==========================================
-   Redux Store Configuration
+   Konfigurasi Redux Store
 ========================================== */
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
+import cartReducer from './slices/cartSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    cart: cartReducer,
   },
-  // Tambahkan middleware lain kalau butuh
+  // Menambahkan middleware tambahan jika diperlukan
 });
 
 export default store;

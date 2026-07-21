@@ -113,9 +113,9 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
     try {
       const data = await api.auth.login(nim.trim(), password);
 
-      if (data.status === "SUCCESS" && data.token) {
+      if (parseInt(data.status) === 200 && data.data) {
         // Simpan token di AsyncStorage
-        await AsyncStorage.setItem("userToken", data.token);
+        await AsyncStorage.setItem("userToken", data.data);
         
         // Coba narik data profil dari backend (karena tokennya udah bisa dipake lewat interceptor)
         let userProfile = null;
@@ -123,26 +123,31 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
           // Temporarily set token in API headers just for this request since interceptor
           // might not immediately have the token if AsyncStorage takes a split second
           const profileResponse = await api.users.getProfile();
-          if (profileResponse.status === "200") {
+          if (parseInt(profileResponse.status) === 200 && profileResponse.data) {
+            const profileData = profileResponse.data;
             userProfile = {
-              nim: profileResponse.idUser,
-              idUser: profileResponse.idUser,
-              name: profileResponse.name,
-              email: profileResponse.email,
-              phone: profileResponse.phone,
-              studyProgram: profileResponse.studyProgram,
-              profileUrl: profileResponse.profileUrl,
-              role: profileResponse.role,
+              nim: profileData.idUser,
+              idUser: profileData.idUser,
+              name: profileData.name,
+              email: profileData.email,
+              phone: profileData.phone,
+              studyProgram: profileData.studyProgram,
+              profileUrl: profileData.profileUrl,
+              role: profileData.role,
+              status: profileData.status
             };
           }
         } catch (profileErr) {
           console.log("Failed to fetch profile after login", profileErr);
         }
 
-        dispatch(setCredentials({ token: data.token, user: userProfile }));
+        if (userProfile) {
+          await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
+        }
+        dispatch(setCredentials({ token: data.data, user: userProfile }));
       } else {
         const serverMsg = data.message;
-        const translatedMsg = t(`api.${serverMsg}`) || t('auth.login_failed_credential') || "Gagal masuk. NIM/Email atau sandi salah.";
+        const translatedMsg = t(`api.${serverMsg}`) || t('auth.login_failed_credential') || "Gagal masuk. Pastikan kredensial (NIM/Email dan Kata Sandi) Anda benar.";
         showToast(translatedMsg, "danger");
       }
     } catch (err) {
@@ -198,7 +203,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
               </View>
 
               <CustomText type="h1" style={styles.brandText}>
-                <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+                <Text style={{ color: isDark ? Colors.light.surface : Colors.primary.blue500 }}>THRIFT</Text>
                 <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
               </CustomText>
 
@@ -325,7 +330,7 @@ const getStyles = (theme, isDark) => {
       width: 200,
       height: 200,
       borderRadius: 100,
-      backgroundColor: "#A855F7",
+      backgroundColor: Colors.primary.blue500,
       bottom: -60,
       left: -40,
     },

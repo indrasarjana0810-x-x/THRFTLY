@@ -23,7 +23,6 @@ const Avatar = React.memo(function Avatar({ imageUrl, name = "?", size = 48 }) {
           style={styles.image}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={200}
         />
       ) : (
         <Text style={[styles.initial, { fontSize: size * 0.4 }]}>{initial}</Text>
@@ -48,6 +47,6 @@ const styles = StyleSheet.create({
   },
   initial: {
     fontFamily: 'Barlow-Bold',
-    color: '#FFFFFF',
+    color: Colors.light.surface,
   },
 });

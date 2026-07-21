@@ -1,7 +1,7 @@
 /* ==========================================
-   Main Tab Navigator
+   Navigasi Tab Utama
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -23,8 +23,8 @@ const PlaceholderScreen = ({ title }) => {
   );
 };
 
-const SearchScreen = () => <PlaceholderScreen title="Search" />;
-const WishlistScreen = () => <PlaceholderScreen title="Wishlist" />;
+import SearchScreen from '../screens/SearchScreen';
+import CartScreen from '../screens/CartScreen';
 
 /**
  * MainTabNavigator
@@ -40,7 +40,7 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} />
       <Tab.Screen name="SearchTab" component={SearchScreen} />
-      <Tab.Screen name="WishlistTab" component={WishlistScreen} />
+      <Tab.Screen name="CartTab" component={CartScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6', // light mode background
+    backgroundColor: Colors.light.background, // Latar belakang mode terang
   },
   placeholderText: {
     fontFamily: 'Barlow-Bold',
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   placeholderSub: {
     fontFamily: 'Barlow-Regular',
     fontSize: 16,
-    color: '#6B7280',
+    color: Colors.light.text.secondary,
     marginTop: 8,
   }
 });

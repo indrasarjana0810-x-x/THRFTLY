@@ -141,7 +141,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     setLoading(true);
     try {
       const data = await api.auth.forgotPassword(nim.trim());
-      if (data.status === "SUCCESS") {
+      if (parseInt(data.status) === 200) {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_success') || "Kode OTP berhasil dikirim!", "success");
         setStep(2);
@@ -172,7 +172,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     setLoading(true);
     try {
       const data = await api.auth.verifyOtp(nim.trim(), otpCode.trim());
-      if (data.status === "SUCCESS") {
+      if (parseInt(data.status) === 200) {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_verify_success') || "Verifikasi OTP sukses!", "success");
         setStep(3);
@@ -215,7 +215,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     setLoading(true);
     try {
       const data = await api.auth.resetPassword(nim.trim(), otpCode.trim(), newPassword);
-      if (data.status === "SUCCESS") {
+      if (parseInt(data.status) === 200) {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.toast_password_updated') || "Kata sandi diperbarui!", "success");
         onNavigateToLogin();
@@ -274,7 +274,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
               </View>
 
               <CustomText type="h1" style={styles.brandText}>
-                <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+                <Text style={{ color: isDark ? Colors.light.surface : Colors.primary.blue500 }}>THRIFT</Text>
                 <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
               </CustomText>
 
@@ -302,7 +302,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                   >
                     {step > 1 ? (
                       <Animated.View style={{ transform: [{ scale: checkPop1 }] }}>
-                        <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        <MaterialIcons name="check" size={14} color={Colors.light.surface} />
                       </Animated.View>
                     ) : (
                       <Text style={[styles.stepNodeText, step === 1 ? styles.activeNodeText : styles.inactiveNodeText]}>
@@ -326,7 +326,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                   >
                     {step > 2 ? (
                       <Animated.View style={{ transform: [{ scale: checkPop2 }] }}>
-                        <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        <MaterialIcons name="check" size={14} color={Colors.light.surface} />
                       </Animated.View>
                     ) : (
                       <Text style={[styles.stepNodeText, step === 2 ? styles.activeNodeText : styles.inactiveNodeText]}>
@@ -531,7 +531,7 @@ const getStyles = (theme, isDark) => {
       width: 200,
       height: 200,
       borderRadius: 100,
-      backgroundColor: "#A855F7",
+      backgroundColor: Colors.primary.blue500,
       bottom: -60,
       left: -40,
     },
@@ -656,7 +656,7 @@ const getStyles = (theme, isDark) => {
       color: theme.text.placeholder,
     },
     activeNodeText: {
-      color: "#FFFFFF",
+      color: Colors.light.surface,
     },
     inactiveNodeText: {
       color: theme.text.placeholder,

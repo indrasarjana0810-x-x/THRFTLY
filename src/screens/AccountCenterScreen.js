@@ -67,7 +67,7 @@ export default function AccountCenterScreen({ navigation }) {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
       if (permissionResult.granted === false) {
-        showToast('Izin kamera ditolak. Silakan izinkan di pengaturan HP.', 'danger');
+        showToast('Izin akses kamera ditolak. Silakan izinkan melalui pengaturan perangkat.', 'danger');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -86,7 +86,7 @@ export default function AccountCenterScreen({ navigation }) {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (permissionResult.granted === false) {
-        showToast('Izin galeri ditolak. Silakan izinkan di pengaturan HP.', 'danger');
+        showToast('Izin akses galeri ditolak. Silakan izinkan melalui pengaturan perangkat.', 'danger');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -199,7 +199,7 @@ export default function AccountCenterScreen({ navigation }) {
     setLoading(true);
     try {
       const data = await api.users.updateProfile(name, phone);
-      if (data.status === '200') {
+      if (parseInt(data.status) === 200) {
         showToast(t('common.success') || 'Perubahan berhasil disimpan!', 'success');
         dispatch(setCredentials({ 
           token, 
@@ -232,10 +232,10 @@ export default function AccountCenterScreen({ navigation }) {
     setErrors({});
     let localErrors = {};
 
-    if (!oldPassword) localErrors.oldPassword = t('auth.password_required') || "Sandi saat ini wajib diisi";
-    if (!newPassword) localErrors.newPassword = t('auth.toast_new_password_required') || "Sandi baru wajib diisi";
-    else if (newPassword.length < 8) localErrors.newPassword = t('auth.password_min') || "Sandi baru minimal 8 karakter";
-    if (newPassword !== confirmPassword) localErrors.confirmPassword = t('auth.toast_password_mismatch') || "Konfirmasi sandi tidak cocok";
+    if (!oldPassword) localErrors.oldPassword = t('auth.password_required') || "Kata sandi saat ini wajib diisi.";
+    if (!newPassword) localErrors.newPassword = t('auth.toast_new_password_required') || "Kata sandi baru wajib diisi.";
+    else if (newPassword.length < 8) localErrors.newPassword = t('auth.password_min') || "Kata sandi baru minimal 8 karakter.";
+    if (newPassword !== confirmPassword) localErrors.confirmPassword = t('auth.toast_password_mismatch') || "Konfirmasi kata sandi tidak cocok.";
 
     if (Object.keys(localErrors).length > 0) {
       setErrors(localErrors);
@@ -245,7 +245,7 @@ export default function AccountCenterScreen({ navigation }) {
     setPasswordLoading(true);
     try {
       const data = await api.users.changePassword(oldPassword, newPassword, confirmPassword);
-      if (data.status === '200') {
+      if (parseInt(data.status) === 200) {
         showToast(t('auth.toast_password_updated') || 'Kata sandi berhasil diubah!', 'success');
         closePasswordModal();
       } else {
@@ -306,7 +306,7 @@ export default function AccountCenterScreen({ navigation }) {
               />
               {isUploading ? (
                 <View style={[StyleSheet.absoluteFill, styles.uploadingOverlay]}>
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <ActivityIndicator size="small" color={Colors.light.surface} />
                 </View>
               ) : (
                 <View style={[
@@ -315,11 +315,11 @@ export default function AccountCenterScreen({ navigation }) {
                     backgroundColor: Colors.primary.blue500, 
                     borderColor: theme.background,
                     elevation: 3,
-                    shadowColor: isDark ? '#FFFFFF' : '#000000',
+                    shadowColor: isDark ? Colors.light.surface : Colors.common.black,
                     shadowOpacity: isDark ? 0.35 : 0.15
                   }
                 ]}>
-                  <Ionicons name="camera" size={16} color="#FFF" />
+                  <Ionicons name="camera" size={16} color={Colors.light.surface} />
                 </View>
               )}
             </TouchableOpacity>
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,

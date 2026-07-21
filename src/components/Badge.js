@@ -1,7 +1,8 @@
-// src/components/Badge.js
-
+/* ==========================================
+   Badge
+========================================== */
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import Colors from '../constants/colors';
 
 export default function Badge({
@@ -11,13 +12,16 @@ export default function Badge({
   style,
   textStyle,
 }) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const theme = isDark ? Colors.dark : Colors.light;
   const isCountMode = count !== undefined && count !== null;
 
   if (isCountMode) {
     if (count <= 0) return null;
     
     return (
-      <View style={[styles.countContainer, style]}>
+      <View style={[styles.countContainer, { borderColor: theme.background }, style]}>
         <Text style={[styles.countText, textStyle]}>
           {count > 99 ? '99+' : count}
         </Text>
@@ -31,6 +35,7 @@ export default function Badge({
     return [
       styles.badge,
       styles[type] || styles.primary,
+      type === 'neutral' && { backgroundColor: theme.border },
       style,
     ];
   };
@@ -39,6 +44,7 @@ export default function Badge({
     return [
       styles.badgeText,
       styles[`text_${type}`] || styles.text_primary,
+      type === 'neutral' && { color: theme.text.secondary },
       textStyle,
     ];
   };
@@ -89,10 +95,10 @@ const styles = StyleSheet.create({
     color: Colors.semantic.error.dark,
   },
   neutral: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.light.border,
   },
   text_neutral: {
-    color: '#6B7280',
+    color: Colors.light.text.secondary,
   },
   // Count indicator mode
   countContainer: {
@@ -107,11 +113,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderColor: Colors.light.surface,
     zIndex: 20,
   },
   countText: {
-    color: '#FFFFFF',
+    color: Colors.light.surface,
     fontFamily: 'Barlow-Bold',
     fontSize: 8,
     textAlign: 'center',

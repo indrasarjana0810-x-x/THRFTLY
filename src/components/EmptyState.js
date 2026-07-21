@@ -1,5 +1,6 @@
-// src/components/EmptyState.js
-
+/* ==========================================
+   Empty State
+========================================== */
 import React from 'react';
 import { View, StyleSheet, useColorScheme } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,7 +11,7 @@ import CustomButton from './CustomButton';
 export default function EmptyState({
   title,
   description,
-  icon = 'package',
+  icon = 'shopping-cart',
   buttonTitle,
   onButtonPress,
   style,
@@ -19,10 +20,12 @@ export default function EmptyState({
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
 
+  const validIcon = icon === 'cart' ? 'shopping-cart' : icon === 'package' ? 'inventory-2' : icon;
+
   return (
     <View style={[styles.container, style]}>
-      <View style={[styles.iconCircle, { backgroundColor: isDark ? '#232335' : '#F3F4F6' }]}>
-        <MaterialIcons name={icon} size={32} color={Colors.primary.blue500} />
+      <View style={[styles.iconCircle, { backgroundColor: theme.border }]}>
+        <MaterialIcons name={validIcon} size={32} color={Colors.primary.blue500} />
       </View>
       
       <CustomText type="h2" style={styles.title}>

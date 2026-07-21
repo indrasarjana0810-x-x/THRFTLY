@@ -56,7 +56,7 @@ export default function SegmentedControl({
   });
 
   return (
-    <View style={[styles.segmentWrapper, { backgroundColor: isDark ? '#2E2E45' : '#E2E8F0' }]}>
+    <View style={[styles.segmentWrapper, { backgroundColor: theme.border }]}>
       <View style={styles.segmentInnerContainer}>
         {/* Background Pill yang Bergerak */}
         <Animated.View
@@ -82,7 +82,7 @@ export default function SegmentedControl({
             >
               <CustomText
                 type="body-bold"
-                style={{ color: isSelected ? '#FFF' : theme.text.primary }}
+                style={{ color: isSelected ? Colors.light.surface : theme.text.primary }}
               >
                 {tab.label}
               </CustomText>

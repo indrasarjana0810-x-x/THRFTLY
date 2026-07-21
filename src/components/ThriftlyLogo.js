@@ -1,6 +1,9 @@
-// src/components/ThriftlyLogo.js
+/* ==========================================
+   Thriftly Logo
+========================================== */
 // Thriftly Official SVG Logo Component (Generated from NoText.svg)
 
+import Colors from '../constants/colors';
 import React from "react";
 import Svg, { G, Path } from "react-native-svg";
 
@@ -28,7 +31,7 @@ const getThemeColor = (hex, darkMode) => {
   const isBlue = b > r && b > g - 30;
 
   if (isBlue) {
-    return "#FFFFFF"; // Ubah biru ke putih  //
+    return Colors.common.white; // Ubah biru ke putih  //
   }
 
   return hex;

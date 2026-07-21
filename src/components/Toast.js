@@ -1,7 +1,8 @@
-// src/components/Toast.js
-
+/* ==========================================
+   Toast
+========================================== */
 import React, { createContext, useContext, useState, useRef } from "react";
-import { StyleSheet, View, Text, Animated, Platform } from "react-native";
+import { StyleSheet, View, Text, Animated, Platform, TouchableOpacity } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "../constants/colors";
 
@@ -97,6 +98,15 @@ export function ToastProvider({ children }) {
     }
   };
 
+  const getTextColor = () => {
+    switch (toast.type) {
+      case "success": return Colors.semantic.success.dark;
+      case "danger": return Colors.semantic.error.dark;
+      case "warning": return Colors.semantic.warning.dark;
+      default: return Colors.semantic.info.dark;
+    }
+  };
+
   const getIcon = () => {
     switch (toast.type) {
       case "success":
@@ -152,6 +162,9 @@ export function ToastProvider({ children }) {
             <Text style={[styles.messageText, getTextStyle()]} numberOfLines={2}>
               {toast.message}
             </Text>
+            <TouchableOpacity onPress={() => hideToast()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.closeBtn}>
+              <MaterialIcons name="close" size={16} color={getTextColor()} />
+            </TouchableOpacity>
           </View>
           
           {/* Progress Line Bar di bagian bawah Toast  // */}
@@ -184,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     overflow: "hidden", // Diperlukan agar progress bar terpotong sesuai border radius  //
-    shadowColor: "#000000",
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
@@ -206,6 +219,9 @@ const styles = StyleSheet.create({
     fontFamily: "Barlow-Bold",
     fontSize: 13,
     flex: 1,
+  },
+  closeBtn: {
+    padding: 2,
   },
   progressBar: {
     position: "absolute",

@@ -1,5 +1,5 @@
 /* ==========================================
-   API Client
+   Klien API (Axios)
 ========================================== */
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -22,7 +22,7 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (e) {
-      console.log('Error getting token for interceptor', e);
+      console.log('Gagal mengambil token untuk interceptor', e);
     }
     return config;
   },
@@ -143,6 +143,26 @@ const api = {
       return response.data;
     }
   },
+  checksheet: {
+    /**
+     * Get Checksheet Templates
+     * Mengambil template checksheet berdasarkan ID kategori.
+     */
+    getTemplates: async (categoryId) => {
+      const response = await apiClient.get(`/checksheet/template/${categoryId}`);
+      return response.data;
+    }
+  },
+  cart: {
+    get: async () => {
+      const response = await apiClient.get("/cart");
+      return response.data;
+    },
+    toggle: async (idItem) => {
+      const response = await apiClient.post(`/cart/toggle/${idItem}`);
+      return response.data;
+    }
+  },
   items: {
     /**
      * Create Item
@@ -204,6 +224,30 @@ const api = {
      */
     delete: async (id) => {
       const response = await apiClient.delete(`/item/${id}`);
+      return response.data;
+    }
+  },
+  transaction: {
+    checkout: async (itemIds, meetingNote) => {
+      const response = await apiClient.post("/transaction/checkout", { itemIds, meetingNote });
+      return response.data;
+    },
+    getBuyerTransactions: async () => {
+      const response = await apiClient.get("/transaction/buyer");
+      return response.data;
+    },
+    getSellerTransactions: async () => {
+      const response = await apiClient.get("/transaction/seller");
+      return response.data;
+    },
+    updateStatus: async (id, status) => {
+      const response = await apiClient.put(`/transaction/${id}/status`, { status });
+      return response.data;
+    }
+  },
+  checksheet: {
+    getTemplates: async (categoryId) => {
+      const response = await apiClient.get(`/checksheet/template/${categoryId}`);
       return response.data;
     }
   }

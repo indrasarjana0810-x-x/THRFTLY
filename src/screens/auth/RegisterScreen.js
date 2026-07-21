@@ -231,7 +231,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
         phone: phone.trim(),
       });
 
-      if (data.status === "SUCCESS") {
+      if (parseInt(data.status) === 201) {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.register_success') || "Pendaftaran Berhasil! Silakan masuk.", "success");
         if (onRegisterSuccess) {
@@ -298,7 +298,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
               </View>
 
               <CustomText type="h1" style={styles.brandText}>
-                <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+                <Text style={{ color: isDark ? Colors.light.surface : Colors.primary.blue500 }}>THRIFT</Text>
                 <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
               </CustomText>
 
@@ -317,7 +317,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                   >
                     {step > 1 ? (
                       <Animated.View style={{ transform: [{ scale: checkPop1 }] }}>
-                        <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        <MaterialIcons name="check" size={14} color={Colors.light.surface} />
                       </Animated.View>
                     ) : (
                       <Text style={[styles.stepNodeText, step === 1 ? styles.activeNodeText : styles.inactiveNodeText]}>
@@ -443,7 +443,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
                       style={[
                         styles.selectWrapper,
                         {
-                          backgroundColor: isDark ? Colors.dark.background : "#F9FAFB",
+                          backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
                           borderColor: errors.studyProgram ? Colors.semantic.error.main : theme.border,
                         },
                       ]}
@@ -581,7 +581,7 @@ const getStyles = (theme, isDark) => {
       width: 200,
       height: 200,
       borderRadius: 100,
-      backgroundColor: "#A855F7",
+      backgroundColor: Colors.primary.blue500,
       bottom: -60,
       left: -40,
     },
@@ -702,7 +702,7 @@ const getStyles = (theme, isDark) => {
       color: theme.text.placeholder,
     },
     activeNodeText: {
-      color: "#FFFFFF",
+      color: Colors.light.surface,
     },
     inactiveNodeText: {
       color: theme.text.placeholder,

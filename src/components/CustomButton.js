@@ -1,5 +1,6 @@
-// src/components/CustomButton.js
-
+/* ==========================================
+   Custom Button
+========================================== */
 import React from 'react';
 import {
   TouchableOpacity,
@@ -11,6 +12,10 @@ import {
 import Colors from '../constants/colors';
 import { Shadows } from '../constants/styles';
 
+/**
+ * CustomButton
+ * Komponen tombol kustom yang dapat digunakan ulang dengan dukungan berbagai varian dan status loading.
+ */
 export default function CustomButton({
   title,
   onPress,
@@ -70,7 +75,7 @@ export default function CustomButton({
   };
 
   const getLoaderColor = () => {
-    if (type === 'primary') return '#FFFFFF';
+    if (type === 'primary') return Colors.light.surface;
     if (type === 'secondary') return theme.text.heading;
     return Colors.primary.blue500;
   };
@@ -128,7 +133,7 @@ const getStyles = (theme, isDark) => {
       ...Shadows.primary,
     },
     secondary: {
-      backgroundColor: isDark ? '#222235' : '#F3F4F6',
+      backgroundColor: isDark ? Colors.dark.border : Colors.light.border,
       borderWidth: 1,
       borderColor: theme.border,
     },
@@ -143,8 +148,8 @@ const getStyles = (theme, isDark) => {
       height: 'auto',
     },
     disabled: {
-      backgroundColor: isDark ? '#2E2E3E' : '#E5E7EB',
-      borderColor: isDark ? '#2E2E3E' : '#E5E7EB',
+      backgroundColor: isDark ? Colors.dark.border : Colors.light.border,
+      borderColor: isDark ? Colors.dark.border : Colors.light.border,
       shadowOpacity: 0,
       elevation: 0,
     },
@@ -163,7 +168,7 @@ const getStyles = (theme, isDark) => {
       fontSize: 17,
     },
     textPrimary: {
-      color: '#FFFFFF',
+      color: Colors.light.surface,
     },
     textSecondary: {
       color: theme.text.primary,
@@ -175,7 +180,7 @@ const getStyles = (theme, isDark) => {
       color: Colors.primary.blue500,
     },
     textDisabled: {
-      color: isDark ? '#555566' : '#9CA3AF',
+      color: isDark ? Colors.dark.text.placeholder : Colors.light.text.placeholder,
     },
   });
 };

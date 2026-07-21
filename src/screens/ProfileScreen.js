@@ -102,7 +102,7 @@ export default function ProfileScreen({ navigation }) {
       title: t('profile.preferences') || 'Preferensi',
       data: [
         { id: 'language', title: t('profile.language'), desc: locale === 'id' ? 'Indonesia' : 'English', icon: 'language-outline', color: Colors.primary.blue500, type: 'language' },
-        { id: 'notification', title: t('profile.menu_notification') || 'Notifikasi', desc: t('profile.desc_notification') || 'Peringatan & pesan', icon: 'notifications-outline', color: '#8B5CF6', type: 'toggle' },
+        { id: 'notification', title: t('profile.menu_notification') || 'Notifikasi', desc: t('profile.desc_notification') || 'Peringatan & pesan', icon: 'notifications-outline', color: Colors.semantic.info.main, type: 'toggle' },
       ]
     }
   ];
@@ -115,6 +115,10 @@ export default function ProfileScreen({ navigation }) {
     }
     if (menu.id === 'my_items') {
       navigation.navigate('MyItems');
+      return;
+    }
+    if (menu.id === 'history') {
+      navigation.navigate('TransactionHistory');
       return;
     }
     if (menu.id === 'language') {
@@ -131,6 +135,7 @@ export default function ProfileScreen({ navigation }) {
     setAlertVisible(false);
     try {
       await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userProfile');
       dispatch(logout());
     } catch (e) {
       console.log('Error clearing token', e);
@@ -263,7 +268,7 @@ export default function ProfileScreen({ navigation }) {
                 ]} 
                 onPress={() => { switchLanguage('id'); closeLangModal(); }}
               >
-                <CustomText type="body-bold" style={{ color: locale === 'id' ? '#FFF' : theme.text.primary }}>Indonesia</CustomText>
+                <CustomText type="body-bold" style={{ color: locale === 'id' ? Colors.light.surface : theme.text.primary }}>Indonesia</CustomText>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -273,7 +278,7 @@ export default function ProfileScreen({ navigation }) {
                 ]} 
                 onPress={() => { switchLanguage('en'); closeLangModal(); }}
               >
-                <CustomText type="body-bold" style={{ color: locale === 'en' ? '#FFF' : theme.text.primary }}>English</CustomText>
+                <CustomText type="body-bold" style={{ color: locale === 'en' ? Colors.light.surface : theme.text.primary }}>English</CustomText>
               </TouchableOpacity>
             </View>
           </View>
@@ -291,7 +296,7 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+    paddingTop: 0,
   },
   container: {
     paddingHorizontal: 20,
@@ -416,7 +421,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
-  // --- BOTTOM SHEET STYLES ---
+  /* ---------- BOTTOM SHEET STYLES ---------- */
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

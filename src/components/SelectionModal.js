@@ -1,3 +1,6 @@
+/* ==========================================
+   Selection Modal
+========================================== */
 import React, { useState } from 'react';
 import {
   View,
@@ -7,7 +10,7 @@ import {
   ScrollView,
   useColorScheme,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import CustomText from './CustomText';
 import CustomInput from './CustomInput';
 import Colors from '../constants/colors';
@@ -81,7 +84,7 @@ export default function SelectionModal({
             ) : (
               <View style={styles.emptyContainer}>
                 <CustomText type="body" style={{ color: theme.text.secondary }}>
-                  Tidak ada hasil
+                  {t('common.empty_search_result') || 'Tidak ada hasil yang ditemukan.'}
                 </CustomText>
               </View>
             )}
@@ -96,7 +99,7 @@ export default function SelectionModal({
             style={styles.cancelBtn}
           >
             <CustomText type="body-bold" style={styles.cancelBtnText}>
-              {t('common.cancel') !== 'common.cancel' && t('common.cancel') ? t('common.cancel') : 'Batal'}
+              {t('common.cancel') || 'Batal'}
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -120,7 +123,7 @@ const styles = StyleSheet.create({
     maxHeight: "80%",
     padding: 24,
     overflow: "hidden",
-    shadowColor: "#000",
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 15,
@@ -152,6 +155,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cancelBtnText: {
-    color: "#FFFFFF",
+    color: Colors.light.surface,
   },
 });

@@ -1,5 +1,5 @@
 /* ==========================================
-   HomeScreen Component
+   Komponen Layar Beranda
 ========================================== */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -17,107 +17,40 @@ import {
   Animated,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { selectAuthUser } from '../store/slices/authSlice';
 import Colors from '../constants/colors';
+import { Shadows } from '../constants/styles';
 import ProductCard from '../components/ProductCard';
+import EmptyState from '../components/EmptyState';
+import CustomText from '../components/CustomText';
+import CustomAlert from '../components/CustomAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useLanguage } from '../localization/LanguageContext';
+import * as Location from 'expo-location';
 import api from '../services/api';
 
 /* ==========================================
-   Dummy Data (Khusus Mahasiswa)
+   Data Dummy (Khusus Mahasiswa)
 ========================================== */
 
-const QUICK_MENUS = [
-  { id: '1', key: 'home.promo', icon: 'location-outline', color: Colors.semantic.success.main, bgLight: 'rgba(34, 197, 94, 0.08)', bgDark: 'rgba(34, 197, 94, 0.12)' },
-  { id: '2', key: 'home.new_arrival', icon: 'people-outline', color: Colors.primary.blue500, bgLight: 'rgba(56, 182, 255, 0.08)', bgDark: 'rgba(56, 182, 255, 0.12)' },
-  { id: '3', key: 'home.favorite', icon: 'cube-outline', color: Colors.primary.yellow500, bgLight: 'rgba(255, 214, 0, 0.12)', bgDark: 'rgba(255, 214, 0, 0.15)' },
-  { id: '4', key: 'home.graduate', icon: 'school-outline', color: Colors.semantic.error.main, bgLight: 'rgba(239, 68, 68, 0.08)', bgDark: 'rgba(239, 68, 68, 0.12)' },
+const SMART_FILTERS = [
+  { id: 'semua', labelId: 'home.filter_all', label: 'Semua', icon: 'grid', color: Colors.primary.blue500 },
+  { id: 'terdekat', labelId: 'home.filter_near', label: 'Terdekat', icon: 'location', color: Colors.primary.blue500 },
+  { id: 'termurah', labelId: 'home.filter_cheap', label: 'Termurah', icon: 'wallet', color: Colors.primary.blue500 },
+  { id: 'mulus', labelId: 'home.filter_good', label: 'Terbaik', icon: 'ribbon', color: Colors.primary.blue500 },
 ];
 
-const HERO_BANNERS = [
-  {
-    id: 'h1',
-    tagline: 'KAMPUS HIGHLIGHT',
-    title: 'Cuci Gudang Anak Kos Lulus!',
-    desc: 'Kipas, Lemari, dan Setup Skripsi Murah',
-    buttonText: 'Sikat Bos! ≫',
-    emoji: '📦',
-  },
-  {
-    id: 'h2',
-    tagline: 'SEMESTER BARU',
-    title: 'Cari Diktat Kuliah Murah',
-    desc: 'Buku Kalkulus, Fisika, dan Jurnal Bekas',
-    buttonText: 'Cari Buku ≫',
-    emoji: '📚',
-  },
-  {
-    id: 'h3',
-    tagline: 'TIPS THRIFTLY',
-    title: 'Bisa Nego via WhatsApp',
-    desc: 'Langsung chat penjual buat deal harga',
-    buttonText: 'Coba Nego ≫',
-    emoji: '💬',
-  },
-];
-
-const INFINITE_BANNERS = Array(3).fill(HERO_BANNERS).flat().map((item, index) => ({
-  ...item,
-  infiniteId: String(index),
-}));
-// Start index di tengah (index HERO_BANNERS.length = 3)
-const INITIAL_BANNER_INDEX = HERO_BANNERS.length;
-
-const LATEST_ITEMS = [
-  {
-    id: '1',
-    title: 'Buku Kalkulus Purcell Ed. 9',
-    price: 150000,
-    condition: 'Baik',
-    location: '1.5km',
-    status: 'Available',
-    imageEmoji: '📚',
-    imageHeight: 180,
-  },
-  {
-    id: '2',
-    title: 'Kemeja Flanel Uniqlo Size L',
-    price: 80000,
-    condition: 'Seperti Baru',
-    location: '800m',
-    status: 'Available',
-    imageEmoji: '👔',
-    imageHeight: 130,
-  },
-  {
-    id: '3',
-    title: 'Monitor PC LG 19 inch (Buat Skripsi)',
-    price: 400000,
-    condition: 'Baik',
-    location: 'COD Area Kos',
-    status: 'Available',
-    imageEmoji: '🖥️',
-    imageHeight: 160,
-  },
-  {
-    id: '4',
-    title: 'Mouse Wireless Logitech M170',
-    price: 65000,
-    condition: 'Sangat Baik',
-    location: '2.1km',
-    status: 'Booked',
-    imageEmoji: '🖱️',
-    imageHeight: 200,
-  },
-];
+// Data dummy LATEST_ITEMS telah dihapus
 
 /* ==========================================
-   Main Screen Component
+   Komponen Layar Utama
 ========================================== */
 /**
  * HomeScreen
@@ -126,70 +59,171 @@ const LATEST_ITEMS = [
  */
 export default function HomeScreen({ navigation, onLogout }) {
   const user = useSelector(selectAuthUser);
-  const { t } = useLanguage();
-  const [favorites, setFavorites] = useState([]);
+  const { t, locale } = useLanguage();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // State untuk Paginasi
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Filter out the logged-in user's own items from the feed
-  const filteredItems = useMemo(() => {
-    if (!user) return items;
-    return items.filter(
-      (item) => item.sellerId !== user.idUser && item.sellerId !== user.nim
-    );
-  }, [items, user]);
+  // State untuk Filter Pintar
+  const [activeSmartFilter, setActiveSmartFilter] = useState('semua');
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationPermAlertVisible, setLocationPermAlertVisible] = useState(false);
 
-  // W4 - useCallback: stabilkan referensi loadItems agar tidak dibuat ulang tiap render
-  const loadItems = useCallback(async () => {
+  // Filter lokal dihapus, sekarang menggunakan filter dan urutan dari server
+  // melalui useEffect yang memantau perubahan activeSmartFilter
+
+
+  const loadItems = useCallback(async (isLoadMore = false, isRefreshing = false) => {
+    if (loadingMore) return;
+    
+    let currentPage = 0;
+    if (isLoadMore) {
+      if (page + 1 >= totalPages) return;
+      currentPage = page + 1;
+      setLoadingMore(true);
+    } else if (isRefreshing) {
+      currentPage = 0;
+      setPage(0);
+    } else {
+      currentPage = 0;
+      setPage(0);
+    }
+
     try {
-      const res = await api.items.getAll();
-      if (res && res.status === "200" && res.items) {
-        setItems(res.items);
+      let sortByParam = undefined;
+      let conditionParam = undefined;
+      
+      if (activeSmartFilter === 'terdekat') sortByParam = 'nearest';
+      if (activeSmartFilter === 'termurah') sortByParam = 'cheapest';
+      if (activeSmartFilter === 'mulus') conditionParam = 'Sangat Baik';
+
+      const params = { 
+        page: currentPage, 
+        size: 10,
+        sortBy: sortByParam,
+        condition: conditionParam
+      };
+      
+      if (activeSmartFilter === 'terdekat' && userLocation) {
+        params.userLat = userLocation.latitude;
+        params.userLng = userLocation.longitude;
+      }
+
+      const res = await api.items.getAll(params);
+      if (res && parseInt(res.status) === 200 && res.data) {
+        let fetchedItems = res.data.content || [];
+
+        if (isLoadMore) {
+          setItems(prev => [...prev, ...fetchedItems]);
+        } else {
+          setItems(fetchedItems);
+        }
+        setPage(res.data.currentPage || 0);
+        setTotalPages(res.data.totalPages || 1);
       }
     } catch (error) {
-      console.log("Error loading items on HomeScreen:", error);
+      console.warn('Error loading items from API:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [activeSmartFilter, userLocation, page, totalPages, loadingMore]);
 
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    setLoading(true);
+    setItems([]);
+    loadItems(false);
+  }, [activeSmartFilter, userLocation]); // Memuat ulang data barang ketika filter atau lokasi berubah
+
+  useEffect(() => {
+    // Memeriksa izin lokasi saat aplikasi dimuat agar ProductCard dapat menampilkan jarak yang akurat
+    (async () => {
+      try {
+        let { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          let location = await Location.getCurrentPositionAsync({});
+          setUserLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+        } else {
+          // Menampilkan CustomAlert saat pertama dimuat untuk meminta izin akses lokasi demi akurasi jarak
+          setLocationPermAlertVisible(true);
+        }
+      } catch (error) {
+        console.warn('Error checking location permission:', error);
+      }
+    })();
+  }, []); // Hanya dijalankan sekali saat komponen dimuat
+
+  const handleSelectFilter = async (filterId) => {
+    if (filterId === 'terdekat') {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          if (!userLocation) {
+            let location = await Location.getCurrentPositionAsync({});
+            setUserLocation({
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            });
+          }
+          setActiveSmartFilter('terdekat');
+        } else {
+          setLocationPermAlertVisible(true);
+        }
+      } catch (e) {
+        console.warn('Error handling location filter:', e);
+        setActiveSmartFilter('semua');
+      }
+    } else {
+      setActiveSmartFilter(filterId);
+    }
+  };
+
+  const handleConfirmLocationPermission = async () => {
+    setLocationPermAlertVisible(false);
+    try {
+      let { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        let location = await Location.getCurrentPositionAsync({});
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      } else {
+        if (!canAskAgain) {
+          Alert.alert(
+            locale === 'id' ? 'Akses Lokasi Ditolak' : 'Location Access Denied',
+            locale === 'id' 
+              ? 'Izin lokasi dinonaktifkan di Pengaturan HP Anda. Silakan izinkan akses lokasi melalui Pengaturan Perangkat.' 
+              : 'Location permission is disabled in your device Settings. Please enable location access in Device Settings.',
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    } catch (error) {
+      console.warn('Error requesting location permission:', error);
+    }
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadItems();
+    loadItems(false, true);
   };
 
-  const flatListRef = useRef(null);
-  const currentIndexRef = useRef(INITIAL_BANNER_INDEX);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }) => {
+    const paddingToBottom = 50;
+    return layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+  };
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // NOTE: Mengembalikan index ke posisi tengah jika mencapai akhir array
-      if (currentIndexRef.current >= INFINITE_BANNERS.length - 1) {
-        currentIndexRef.current = INITIAL_BANNER_INDEX;
-        if (flatListRef.current) {
-          flatListRef.current.scrollToIndex({ index: currentIndexRef.current, animated: false });
-        }
-      }
-
-      // Melanjutkan pergeseran animasi carousel
-      setTimeout(() => {
-        currentIndexRef.current += 1;
-        if (flatListRef.current) {
-          flatListRef.current.scrollToIndex({ index: currentIndexRef.current, animated: true });
-        }
-      }, 50);
-
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Carousel logic removed
 
   // Deteksi tema otomatis dari sistem HP
   const colorScheme = useColorScheme();
@@ -199,12 +233,6 @@ export default function HomeScreen({ navigation, onLogout }) {
   // W4 - useMemo: hitung styles sekali, tidak ulang tiap render kecuali tema berubah
   const styles = useMemo(() => getStyles(theme, isDark), [isDark]);
 
-  const toggleFavorite = useCallback((id) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
-    );
-  }, []);
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
@@ -212,38 +240,97 @@ export default function HomeScreen({ navigation, onLogout }) {
         backgroundColor={theme.background}
       />
 
-      {/* 1. Header (Clean Mode: No Search Bar) */}
+      {/* 1. Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Text style={styles.logoText}>
-            <Text style={{ color: isDark ? '#FFFFFF' : Colors.primary.blue500 }}>THRIFT</Text>
+            <Text style={{ color: isDark ? Colors.light.surface : Colors.primary.blue500 }}>THRIFT</Text>
             <Text style={{ color: Colors.primary.yellow500 }}>LY</Text>
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconButton}>
+          {/* Notifications Icon */}
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Notification')}
+          >
             <Ionicons
               name="notifications-outline"
               size={24}
-              color={isDark ? '#FFFFFF' : Colors.primary.blue500}
+              color={isDark ? Colors.light.surface : Colors.primary.blue500}
             />
-            {/* Red dot notification indicator */}
-            <View style={styles.notificationDot} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons
-              name="cart-outline"
-              size={24}
-              color={isDark ? '#FFFFFF' : Colors.primary.blue500}
-            />
+            {/* Notification counter badge */}
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>3</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* 3. Smart Filters (Fixed at Top) */}
+      <View style={[styles.quickMenuContainer, { paddingTop: 16, marginTop: 0, paddingBottom: 12, backgroundColor: theme.background }]}>
+        {SMART_FILTERS.map((filter) => {
+          const isSelected = activeSmartFilter === filter.id;
+          return (
+            <TouchableOpacity 
+              key={filter.id} 
+              style={styles.quickMenuItem} 
+              activeOpacity={0.7}
+              onPress={() => handleSelectFilter(filter.id)}
+            >
+              <View style={[
+                styles.quickMenuIconBg, 
+                { 
+                  backgroundColor: isDark ? theme.surface : Colors.common.white,
+                  borderWidth: 1,
+                  borderColor: isDark ? theme.border : Colors.light.border,
+                  ...Shadows.primary,
+                  elevation: 2,
+                },
+                isSelected && {
+                  backgroundColor: Colors.primary.blue500,
+                  borderColor: Colors.primary.blue500,
+                  shadowColor: Colors.primary.blue500,
+                  shadowOpacity: 0.3,
+                  elevation: 6,
+                }
+              ]}>
+                <Ionicons 
+                  name={isSelected ? filter.icon : `${filter.icon}-outline`} 
+                  size={28} 
+                  color={isSelected ? Colors.common.white : (isDark ? Colors.light.surface : filter.color)} 
+                />
+              </View>
+              <Text style={[
+                styles.quickMenuLabel,
+                isSelected && { color: Colors.primary.blue500, fontFamily: 'Barlow-Bold' }
+              ]}>
+                {t(filter.labelId) || filter.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+        {/* 4. Main Feed: Terbaru / For You (Masonry) */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {activeSmartFilter === 'semua' ? (t('home.recommended') || 'Rekomendasi Untuk Anda') : 
+             activeSmartFilter === 'terdekat' ? (t('home.title_near') || 'Terdekat Dari Anda') :
+             activeSmartFilter === 'termurah' ? (t('home.title_cheap') || 'Harga Termurah') : (t('home.title_good') || 'Pilihan Terbaik')}
+          </Text>
+        </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={({ nativeEvent }) => {
+          if (isCloseToBottom(nativeEvent)) {
+            loadItems(true);
+          }
+        }}
+        scrollEventThrottle={400}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -253,189 +340,72 @@ export default function HomeScreen({ navigation, onLogout }) {
           />
         }
       >
-        {/* 2. Hero Banner Carousel */}
-        <View style={styles.heroCardContainer}>
-          <View style={styles.heroCardBg}>
-            <Animated.FlatList
-              ref={flatListRef}
-              data={INFINITE_BANNERS}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.infiniteId}
-              initialScrollIndex={INITIAL_BANNER_INDEX}
-              getItemLayout={(data, index) => ({
-                length: Dimensions.get('window').width - 48,
-                offset: (Dimensions.get('window').width - 48) * index,
-                index,
-              })}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                { useNativeDriver: false }
-              )}
-              scrollEventThrottle={16}
-              onScrollToIndexFailed={(info) => {
-                // WARNING: Menangani error out of range jika engine lambat merender index
-                const wait = new Promise(resolve => setTimeout(resolve, 500));
-                wait.then(() => {
-                  if (flatListRef.current && info.index >= 0 && info.index < INFINITE_BANNERS.length) {
-                    flatListRef.current.scrollToIndex({ index: info.index, animated: true });
-                  }
-                });
-              }}
-              onMomentumScrollEnd={(e) => {
-                const newIndex = Math.round(
-                  e.nativeEvent.contentOffset.x / (Dimensions.get('window').width - 48)
-                );
-                currentIndexRef.current = newIndex;
-              }}
-              renderItem={({ item }) => (
-                <View style={styles.heroSlide}>
-                  <View style={styles.heroLeft}>
-                    <Text style={styles.heroTagline}>{item.tagline}</Text>
-                    <Text style={styles.heroTitle}>{item.title}</Text>
-                    <Text style={styles.heroDesc}>{item.desc}</Text>
-
-                    <TouchableOpacity style={styles.heroDetailsBtnContainer} activeOpacity={0.8}>
-                      <BlurView
-                        intensity={40}
-                        tint={isDark ? 'dark' : 'light'}
-                        experimentalBlurMethod="dimezisBlurView"
-                        style={styles.heroDetailsBtn}
-                      >
-                        <Text style={styles.heroDetailsBtnText}>{item.buttonText}</Text>
-                      </BlurView>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.heroRight}>
-                    <Text style={styles.heroProductEmoji}>{item.emoji}</Text>
-                  </View>
-                </View>
-              )}
-            />
-          </View>
-
-          {/* Carousel Dots di Luar Card */}
-          <View style={styles.carouselDots}>
-            {HERO_BANNERS.map((_, i) => {
-              const cardWidth = Dimensions.get('window').width - 48;
-
-              const inputRange = [];
-              const widthOutputRange = [];
-              const colorOutputRange = [];
-
-              INFINITE_BANNERS.forEach((_, index) => {
-                inputRange.push(index * cardWidth);
-                if (index % HERO_BANNERS.length === i) {
-                  widthOutputRange.push(16);
-                  colorOutputRange.push(Colors.primary.yellow500);
-                } else {
-                  widthOutputRange.push(6);
-                  colorOutputRange.push(isDark ? '#2E2E45' : '#D1D5DB');
-                }
-              });
-
-              const dotWidth = scrollX.interpolate({
-                inputRange,
-                outputRange: widthOutputRange,
-                extrapolate: 'clamp',
-              });
-
-              const dotColor = scrollX.interpolate({
-                inputRange,
-                outputRange: colorOutputRange,
-                extrapolate: 'clamp',
-              });
-
-              return (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.dot,
-                    { width: dotWidth, backgroundColor: dotColor },
-                  ]}
-                />
-              );
-            })}
-          </View>
-        </View>
-
-        {/* 3. Quick Menus (Pengganti Kategori) */}
-        <View style={styles.quickMenuContainer}>
-          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
-            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[0].bgDark : QUICK_MENUS[0].bgLight }]}>
-              <Ionicons name={QUICK_MENUS[0].icon} size={28} color={QUICK_MENUS[0].color} />
-            </View>
-            <Text style={styles.quickMenuLabel}>{t('home.promo') || QUICK_MENUS[0].label}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
-            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[1].bgDark : QUICK_MENUS[1].bgLight }]}>
-              <Ionicons name={QUICK_MENUS[1].icon} size={28} color={QUICK_MENUS[1].color} />
-            </View>
-            <Text style={styles.quickMenuLabel}>{t('home.new_arrival') || QUICK_MENUS[1].label}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
-            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[2].bgDark : QUICK_MENUS[2].bgLight }]}>
-              <Ionicons name={QUICK_MENUS[2].icon} size={28} color={QUICK_MENUS[2].color} />
-            </View>
-            <Text style={styles.quickMenuLabel}>{t('home.favorite') || QUICK_MENUS[2].label}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickMenuItem} activeOpacity={0.7}>
-            <View style={[styles.quickMenuIconBg, { backgroundColor: isDark ? QUICK_MENUS[3].bgDark : QUICK_MENUS[3].bgLight }]}>
-              <Ionicons name={QUICK_MENUS[3].icon} size={28} color={QUICK_MENUS[3].color} />
-            </View>
-            <Text style={styles.quickMenuLabel}>{t('home.graduate') || QUICK_MENUS[3].label}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 4. Main Feed: Terbaru / For You (Masonry) */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{t('home.recommended') || 'Rekomendasi'}</Text>
-        </View>
         {loading ? (
           <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={Colors.primary.blue500} />
           </View>
-        ) : filteredItems.length === 0 ? (
-          <View style={{ paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontFamily: 'Barlow-Medium', color: theme.text.secondary, textAlign: 'center' }}>
-              Belum ada rekomendasi barang dari pengguna lain
-            </Text>
-          </View>
+        ) : items.length === 0 ? (
+          <EmptyState
+            title={t('home.empty_recommended_title') || (locale === 'id' ? 'Belum Ada Rekomendasi' : 'No Recommendations')}
+            description={t('home.empty_recommended_desc') || (locale === 'id' ? 'Belum ada rekomendasi barang dari pengguna lain saat ini.' : 'No recommended items from other users at the moment.')}
+            icon="inbox"
+            style={{ marginTop: 40, marginBottom: 40 }}
+          />
         ) : (
           <View style={styles.masonryContainer}>
             <View style={styles.masonryColumn}>
-              {filteredItems.filter((_, i) => i % 2 === 0).map((item) => (
+              {items.filter((_, i) => i % 2 === 0).map((item) => (
                 <ProductCard
                   key={item.idItem || item.id}
                   item={item}
-                  isFavorite={favorites.includes(item.idItem || item.id)}
                   layout="masonry"
+                  userLocation={userLocation}
                   onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
-                  onFavoritePress={() => toggleFavorite(item.idItem || item.id)}
                   style={{ marginBottom: 16 }}
                 />
               ))}
             </View>
             <View style={styles.masonryColumn}>
-              {filteredItems.filter((_, i) => i % 2 !== 0).map((item) => (
+              {items.filter((_, i) => i % 2 !== 0).map((item) => (
                 <ProductCard
                   key={item.idItem || item.id}
                   item={item}
-                  isFavorite={favorites.includes(item.idItem || item.id)}
                   layout="masonry"
+                  userLocation={userLocation}
                   onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
-                  onFavoritePress={() => toggleFavorite(item.idItem || item.id)}
                   style={{ marginBottom: 16 }}
                 />
               ))}
             </View>
           </View>
         )}
+        {loadingMore && (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={Colors.primary.blue500} />
+          </View>
+        )}
 
         {/* Jarak pemisah untuk menghindari tertutup bottom nav */}
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* --- PRE-PERMISSION LOCATION ALERT --- */}
+      <CustomAlert
+        visible={locationPermAlertVisible}
+        type="info"
+        title={locale === 'id' ? 'Izin Akses Lokasi' : 'Location Access Permission'}
+        message={
+          locale === 'id' 
+            ? 'Aplikasi membutuhkan akses lokasi Anda untuk menampilkan produk dan tempat COD di sekitar Anda. Lanjutkan?' 
+            : 'The app needs location access to display products and COD spots near you. Continue?'
+        }
+        showCancel
+        confirmText={locale === 'id' ? 'Izinkan' : 'Allow'}
+        cancelText={locale === 'id' ? 'Tolak' : 'Deny'}
+        onConfirm={handleConfirmLocationPermission}
+        onCancel={() => setLocationPermAlertVisible(false)}
+        onClose={() => setLocationPermAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -461,8 +431,8 @@ const getStyles = (theme, isDark) => {
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: theme.background,
-      paddingHorizontal: 24,
-      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
+      paddingHorizontal: 20,
+      paddingTop: 12,
       paddingBottom: 12,
     },
     logoContainer: {
@@ -483,97 +453,31 @@ const getStyles = (theme, isDark) => {
       padding: 4,
       position: 'relative',
     },
-    notificationDot: {
+    notificationBadge: {
       position: 'absolute',
-      top: 4,
-      right: 4,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+      top: 0,
+      right: -2,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
       backgroundColor: Colors.semantic.error.main,
       borderWidth: 1.5,
       borderColor: theme.background,
-    },
-    heroCardContainer: {
-      marginTop: 10,
-    },
-    heroCardBg: {
-      backgroundColor: isDark ? Colors.primary.blue700 : Colors.primary.blue500,
-      marginHorizontal: 24,
-      borderRadius: 24,
-      minHeight: 160,
-      overflow: 'hidden',
-    },
-    heroSlide: {
-      flexDirection: 'row',
-      width: Dimensions.get('window').width - 48,
-      padding: 24,
-    },
-    heroLeft: {
-      flex: 1.3,
-      justifyContent: 'center',
-    },
-    heroTagline: {
-      fontFamily: 'Barlow-Bold',
-      fontSize: 10,
-      color: Colors.primary.yellow500,
-      letterSpacing: 1.5,
-      marginBottom: 6,
-    },
-    heroTitle: {
-      fontFamily: 'Barlow-Black',
-      fontSize: 22,
-      color: '#FFFFFF',
-      letterSpacing: -0.5,
-      lineHeight: 26,
-    },
-    heroDesc: {
-      fontFamily: 'Barlow-Regular',
-      fontSize: 11,
-      color: 'rgba(255, 255, 255, 0.85)',
-      marginTop: 6,
-      lineHeight: 16,
-    },
-    heroDetailsBtnContainer: {
-      alignSelf: 'flex-start',
-      marginTop: 16,
-      borderRadius: 50,
-      overflow: 'hidden',
-    },
-    heroDetailsBtn: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    heroDetailsBtnText: {
-      fontFamily: 'Barlow-Bold',
-      fontSize: 11,
-      color: '#FFFFFF',
-    },
-    heroRight: {
-      flex: 0.7,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    heroProductEmoji: {
-      fontSize: 60,
-    },
-    carouselDots: {
-      flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      gap: 6,
-      marginTop: 12,
+      paddingHorizontal: 4,
     },
-    dot: {
-      height: 6,
-      borderRadius: 3,
+    notificationBadgeText: {
+      color: Colors.common.white,
+      fontSize: 9,
+      fontFamily: 'Barlow-Bold',
     },
+    // Hero Carousel Styles Removed
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 24,
+      paddingHorizontal: 20,
       marginTop: 28,
       marginBottom: 16,
     },
@@ -617,16 +521,81 @@ const getStyles = (theme, isDark) => {
     quickMenuLabel: {
       fontFamily: 'Barlow-Medium',
       fontSize: 11, // Kecilin dikit biar muat 1 baris
-      color: isDark ? '#E5E7EB' : Colors.primary.blue500,
+      color: isDark ? Colors.dark.text.secondary : Colors.primary.blue500,
       textAlign: 'center',
     },
     masonryContainer: {
       flexDirection: 'row',
-      paddingHorizontal: 24,
+      paddingHorizontal: 20,
       justifyContent: 'space-between',
     },
     masonryColumn: {
-      width: '47.5%', // Memberi ruang buat gap di tengah
+      width: '48%', // Memberi ruang buat gap di tengah
+    },
+    /* Custom Permission Modal Styles */
+    permissionOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 9999,
+    },
+    permissionBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)',
+    },
+    permissionCard: {
+      width: '85%',
+      maxWidth: 340,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 24,
+      alignItems: 'center',
+      elevation: 24,
+      shadowColor: Colors.common.black,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.25,
+      shadowRadius: 24,
+    },
+    permissionIconBadge: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    permissionTitle: {
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    permissionDesc: {
+      textAlign: 'center',
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    permissionFeatureBox: {
+      width: '100%',
+      borderRadius: 16,
+      borderWidth: 1,
+      padding: 14,
+      marginBottom: 20,
+    },
+    permissionFeatureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    permissionPrimaryBtn: {
+      width: '100%',
+      height: 48,
+      borderRadius: 14,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    permissionSecondaryBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
     },
   });
 };

@@ -129,8 +129,8 @@ export default function SplashScreen({ onFinish, darkMode = false }) {
     };
   }, []);
 
-  const bgColor = darkMode ? "#0A0A0A" : "#FFFFFF";
-  const textColor = darkMode ? "#94A3B8" : "#64748B";
+  const bgColor = darkMode ? Colors.dark.background : Colors.light.surface;
+  const textColor = darkMode ? Colors.dark.text.secondary : Colors.light.text.secondary;
   const glowColor = Colors.primary.blue500;
 
   /* ---------- Render ---------- */
@@ -174,7 +174,7 @@ export default function SplashScreen({ onFinish, darkMode = false }) {
         <View style={styles.typographyContainer}>
           {letters.map((letter, index) => {
             const letterColor = index < 6
-              ? (darkMode ? '#FFFFFF' : Colors.primary.blue500)
+              ? (darkMode ? Colors.light.surface : Colors.primary.blue500)
               : Colors.primary.yellow500;
 
             const translateY = letterAnims[index].interpolate({

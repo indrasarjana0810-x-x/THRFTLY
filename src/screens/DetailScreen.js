@@ -1,5 +1,5 @@
 /* ==========================================
-   Detail Screen — Normal Scroll with Accordions
+   Layar Detail Produk
 ========================================== */
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -23,8 +23,9 @@ import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { selectAuthUser } from '../store/slices/authSlice';
+import { selectCartItems, toggleCartOptimistic, toggleCartApi } from '../store/slices/cartSlice';
 import Colors from '../constants/colors';
 import CustomText from '../components/CustomText';
 import CustomAlert from '../components/CustomAlert';
@@ -34,33 +35,66 @@ import { useToast } from '../components/Toast';
 import { useLanguage } from '../localization/LanguageContext';
 import { formatCurrency } from '../utils/formatCurrency';
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const { width, height } = Dimensions.get('window');
 const IMAGE_HEIGHT = height * 0.52;
-const AccordionSection = React.memo(({ title, isOpen, onToggle, theme, styles, children }) => {
+const AccordionSection = React.memo(({ title, isOpen, onToggle, theme, styles, rightElement, children }) => {
+  const [contentHeight, setContentHeight] = useState(0);
+  const animationProgress = useRef(new Animated.Value(isOpen ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(animationProgress, {
+      toValue: isOpen ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [isOpen]);
+
+  const animatedHeight = animationProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, contentHeight],
+  });
+
+  const rotation = animationProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '-180deg'],
+  });
+
   return (
-    <View>
+    <View style={{ overflow: 'hidden' }}>
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onToggle}
         style={[styles.accordionHeader, { borderBottomColor: theme.border }]}
       >
-        <CustomText style={[styles.sectionLabel, { color: theme.text.primary }]}>{title}</CustomText>
-        <Ionicons
-          name={isOpen ? 'chevron-up' : 'chevron-down'}
-          size={16}
-          color={theme.text.secondary}
-        />
-      </TouchableOpacity>
-      {isOpen && (
-        <View style={styles.accordionContent}>
-          {children}
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'space-between', marginRight: 8 }}>
+          <CustomText style={[styles.sectionLabel, { color: theme.text.primary }]}>{title}</CustomText>
+          {rightElement}
         </View>
-      )}
+        <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+          <Ionicons
+            name="chevron-down"
+            size={16}
+            color={theme.text.secondary}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+      
+      <Animated.View style={{ height: animatedHeight, overflow: 'hidden' }}>
+        <View 
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h > 0 && Math.abs(h - contentHeight) > 1) {
+              setContentHeight(h);
+            }
+          }}
+          style={{ position: 'absolute', width: '100%', top: 0, left: 0 }}
+        >
+          <View style={styles.accordionContent}>
+            {children}
+          </View>
+        </View>
+      </Animated.View>
     </View>
   );
 });
@@ -70,24 +104,88 @@ export default function DetailScreen({ route, navigation }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { showToast } = useToast();
   const user = useSelector(selectAuthUser);
+  const dispatch = useDispatch();
+  const cartItems = useSelector(selectCartItems) || [];
+  const isFavorite = cartItems.includes(id);
+
+  /* ---------- Scroll Animations ---------- */
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const iconOpacityTop = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const iconOpacitySolid = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   /* ---------- Data State ---------- */
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [isDeleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
   /* ---------- Bookmark Particle Animation (sama seperti ProductCard) ---------- */
   const bookmarkScaleAnim = useRef(new Animated.Value(1)).current;
   const bookmarkParticleAnim = useRef(new Animated.Value(0)).current;
 
+  /* ---------- Checksheet Sublist Animation ---------- */
+  const [showAllChecksheet, setShowAllChecksheet] = useState(false);
+  const [subListHeight, setSubListHeight] = useState(0);
+  const subListAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(subListAnim, {
+      toValue: showAllChecksheet ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [showAllChecksheet]);
+
+  const animatedSubHeight = subListAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, subListHeight],
+  });
+
+  const subChevronRotation = subListAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '-180deg'],
+  });
+
+  const opacityOpen = subListAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const opacityClose = subListAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   const handleToggleFavorite = () => {
+    if (!user) {
+      showToast(
+        locale === 'id' 
+          ? 'Anda harus login untuk menyimpan barang ke keranjang belanja' 
+          : 'You must log in to save items to your shopping cart',
+        'warning'
+      );
+      return;
+    }
+
     const nextFavorite = !isFavorite;
-    setIsFavorite(nextFavorite);
+    dispatch(toggleCartOptimistic(id));
+    dispatch(toggleCartApi(id));
 
     if (nextFavorite) {
       // Tambah bookmark: pantul + partikel meledak
@@ -111,12 +209,13 @@ export default function DetailScreen({ route, navigation }) {
   /* ---------- Derived State ---------- */
   const isOwner = user && item && (user.idUser === item.sellerId || user.nim === item.sellerId);
   const imagesList = item?.imageUris?.length > 0 ? item.imageUris : [];
-  const imageBg = isDark ? '#1A1A2E' : '#F0F0F0';
-  const cardBg = isDark ? '#0F0F1A' : '#FFFFFF';
+  const imageBg = isDark ? Colors.dark.surface : Colors.light.border;
+  const cardBg = isDark ? Colors.dark.background : Colors.common.white;
 
   /* ---------- Accordion State ---------- */
   const [openSections, setOpenSections] = useState({
     lokasi: true,
+    checksheet: true,
     deskripsi: true,
     penjual: false,
   });
@@ -180,8 +279,8 @@ export default function DetailScreen({ route, navigation }) {
     try {
       setLoading(true);
       const res = await api.items.getById(id);
-      if (res && res.status === '200' && res.item) {
-        setItem(res.item);
+      if (res && (parseInt(res.status) === 200) && (res.data || res.item)) {
+        setItem(res.data || res.item);
       } else {
         showToast(res.message || 'Gagal memuat detail barang.', 'danger');
         navigation.goBack();
@@ -229,6 +328,16 @@ export default function DetailScreen({ route, navigation }) {
     Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`).catch(() => showToast('Gagal membuka WhatsApp.', 'danger'));
   };
 
+  const handleAddToCart = () => {
+    if (item) {
+      if (isInCart) {
+        dispatch(removeFromCart(item.idItem || item.id));
+      } else {
+        dispatch(addToCart(item));
+      }
+    }
+  };
+
   const handleOpenMap = () => {
     if (!item.latitude) return;
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`)
@@ -251,7 +360,7 @@ export default function DetailScreen({ route, navigation }) {
     setLoading(true);
     try {
       const res = await api.items.delete(item.idItem);
-      if (res?.status === '200') {
+      if (res && parseInt(res.status) === 200) {
         showToast('Barang berhasil dihapus!', 'success');
         navigation.goBack();
       } else {
@@ -270,8 +379,79 @@ export default function DetailScreen({ route, navigation }) {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-      <ScrollView
+      {/* Dynamic Header Background Overlay */}
+      <Animated.View style={[
+        styles.stickyHeader,
+        {
+          backgroundColor: cardBg,
+          opacity: headerBgOpacity,
+        }
+      ]} />
+
+      {/* Floating Sticky Actions */}
+      <View style={[styles.headerActions, { top: Platform.OS === 'ios' ? 56 : 40 }]}>
+        {/* Back Button */}
+        <TouchableOpacity
+          style={styles.actionRoundBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+        >
+          {/* Translucent background for image state */}
+          <Animated.View style={[
+            StyleSheet.absoluteFill,
+            { 
+              borderRadius: 20, 
+              backgroundColor: 'rgba(0,0,0,0.4)', 
+              opacity: iconOpacityTop,
+            }
+          ]} />
+          
+          {/* White icon for image state */}
+          <Animated.View style={{ opacity: iconOpacityTop, position: 'absolute' }}>
+            <Ionicons name="chevron-back" size={22} color={Colors.common.white} />
+          </Animated.View>
+
+          {/* Theme colored icon for solid header state */}
+          <Animated.View style={{ opacity: iconOpacitySolid }}>
+            <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
+          </Animated.View>
+        </TouchableOpacity>
+
+        {/* Share Button */}
+        <TouchableOpacity
+          style={styles.actionRoundBtn}
+          onPress={handleShare}
+          activeOpacity={0.8}
+        >
+          {/* Translucent background for image state */}
+          <Animated.View style={[
+            StyleSheet.absoluteFill,
+            { 
+              borderRadius: 20, 
+              backgroundColor: 'rgba(0,0,0,0.4)', 
+              opacity: iconOpacityTop,
+            }
+          ]} />
+          
+          {/* White icon for image state */}
+          <Animated.View style={{ opacity: iconOpacityTop, position: 'absolute' }}>
+            <Ionicons name="share-social-outline" size={20} color={Colors.common.white} />
+          </Animated.View>
+
+          {/* Theme colored icon for solid header state */}
+          <Animated.View style={{ opacity: iconOpacitySolid }}>
+            <Ionicons name="share-social-outline" size={20} color={theme.text.primary} />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
+
+      <Animated.ScrollView
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
       >
         {/* ==================== IMAGE SECTION ==================== */}
         <View style={[styles.imageSection, { backgroundColor: imageBg }]}>
@@ -305,24 +485,6 @@ export default function DetailScreen({ route, navigation }) {
               <Ionicons name="pricetags-outline" size={80} color={theme.text.placeholder} />
             </View>
           )}
-
-          {/* Back */}
-          <TouchableOpacity
-            style={[styles.floatBtn, { top: Platform.OS === 'ios' ? 56 : 40, left: 20, backgroundColor: cardBg }]}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
-          </TouchableOpacity>
-
-          {/* Share */}
-          <TouchableOpacity
-            style={[styles.floatBtn, { top: Platform.OS === 'ios' ? 56 : 40, right: 20, backgroundColor: cardBg }]}
-            onPress={handleShare}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="share-social-outline" size={20} color={theme.text.primary} />
-          </TouchableOpacity>
 
           {/* Thumbnail Strip (Scrollable, decays size/opacity for items > 3) */}
           {imagesList.length > 1 && (
@@ -372,7 +534,7 @@ export default function DetailScreen({ route, navigation }) {
                 <CustomText style={styles.badgeText}>{item.condition}</CustomText>
               </View>
               <View style={[styles.badge, { backgroundColor: getStatusColor(item.status) }]}>
-                <CustomText style={[styles.badgeText, { color: '#FFF' }]}>{getStatusText(item.status)}</CustomText>
+                <CustomText style={[styles.badgeText, { color: Colors.common.white }]}>{getStatusText(item.status)}</CustomText>
               </View>
             </View>
           </BlurView>
@@ -424,6 +586,208 @@ export default function DetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </AccordionSection>
 
+          {item.checksheet && item.checksheet.length > 0 && (() => {
+            const totalPoints = item.checksheet.length;
+            const failedPoints = item.checksheet.filter(c => !c.passed);
+            const passedPointsCount = item.checksheet.filter(c => c.passed).length;
+            const pct = totalPoints > 0 ? Math.round((passedPointsCount / totalPoints) * 100) : 0;
+            
+            return (
+              <>
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
+                <AccordionSection
+                  title={t('detail.checksheet_title') || (locale === 'id' ? "Kondisi Fisik (Check Sheet)" : "Physical Condition (Check Sheet)")}
+                  isOpen={openSections.checksheet}
+                  onToggle={() => toggleSection('checksheet')}
+                  theme={theme}
+                  styles={styles}
+                  rightElement={
+                    <View style={{ 
+                      backgroundColor: pct === 100 ? Colors.semantic.success.main + '15' : Colors.primary.blue500 + '15', 
+                      paddingHorizontal: 12, 
+                      paddingVertical: 4, 
+                      borderRadius: 8,
+                      borderWidth: 0.5,
+                      borderColor: pct === 100 ? Colors.semantic.success.main + '30' : Colors.primary.blue500 + '30'
+                    }}>
+                      <CustomText style={{ fontFamily: 'Barlow-Bold', fontSize: 13, color: pct === 100 ? Colors.semantic.success.main : Colors.primary.blue500 }}>
+                        {pct}%
+                      </CustomText>
+                    </View>
+                  }
+                >
+                  {pct === 100 ? (
+                    /* 100% OK State — Super clean, aesthetic */
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(240,253,244,0.6)', 
+                      borderColor: isDark ? 'rgba(16,185,129,0.2)' : 'rgba(220,252,231,1)',
+                      borderWidth: 1, 
+                      padding: 14, 
+                      borderRadius: 12,
+                      gap: 10
+                    }}>
+                      <Ionicons name="checkmark-done-circle" size={22} color={Colors.semantic.success.main} />
+                      <CustomText style={{ flex: 1, color: theme.text.primary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
+                        {locale === 'id' ? 'Semua kondisi fisik berfungsi dengan baik (100% OK)' : 'All physical conditions are functioning well (100% OK)'}
+                      </CustomText>
+                    </View>
+                  ) : (
+                    /* Has Flaws State */
+                    <View style={{ gap: 12 }}>
+                      {/* Warning Summary Banner */}
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(254,242,242,0.6)', 
+                        borderColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(254,226,226,1)',
+                        borderWidth: 1, 
+                        padding: 14, 
+                        borderRadius: 12,
+                        gap: 10
+                      }}>
+                        <Ionicons name="alert-circle" size={22} color={Colors.semantic.error.main} />
+                        <View style={{ flex: 1 }}>
+                          <CustomText style={{ color: theme.text.primary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
+                            {locale === 'id' ? `Terdapat ${failedPoints.length} catatan minus dari penjual` : `There are ${failedPoints.length} minus notes from the seller`}
+                          </CustomText>
+                        </View>
+                      </View>
+
+                      {/* Display the flaws directly */}
+                      <View style={{ gap: 10, marginTop: 4 }}>
+                        {failedPoints.map((pointObj) => (
+                          <View 
+                            key={pointObj.templateId} 
+                            style={{ 
+                              backgroundColor: isDark ? theme.surface : Colors.light.background, 
+                              borderColor: theme.border, 
+                              borderWidth: 1, 
+                              borderRadius: 12, 
+                              padding: 12 
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                              <Ionicons name="close-circle" size={16} color={Colors.semantic.error.main} style={{ marginTop: 1 }} />
+                              <CustomText style={{ color: theme.text.primary, fontSize: 13, fontFamily: 'Barlow-Bold', flex: 1 }}>
+                                {t(`checksheet.${pointObj.templateId.toLowerCase()}`) || pointObj.point}
+                              </CustomText>
+                            </View>
+                            {pointObj.note && (
+                              <CustomText style={{ color: theme.text.secondary, fontSize: 12, fontFamily: 'Barlow-Medium', fontStyle: 'italic', marginLeft: 24, marginTop: 4 }}>
+                                Detail: {pointObj.note}
+                              </CustomText>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Toggle Button Header Card (Full-width) */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setShowAllChecksheet(!showAllChecksheet)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      marginTop: 12,
+                      borderWidth: 1.5,
+                      borderColor: theme.border,
+                      borderRadius: 14,
+                      backgroundColor: isDark ? theme.surface : Colors.common.white,
+                      zIndex: 2,
+                      elevation: 2,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <Ionicons 
+                        name="list-outline" 
+                        size={16} 
+                        color={Colors.primary.blue500} 
+                      />
+                      <View style={{ flex: 1, height: 20, justifyContent: 'center' }}>
+                        <Animated.View style={{ position: 'absolute', left: 0, opacity: opacityOpen }}>
+                          <CustomText style={{ color: Colors.primary.blue500, fontFamily: 'Barlow-Bold', fontSize: 13 }}>
+                            {locale === 'id' ? 'Lihat Semua Pengecekan' : 'View All Checks'}
+                          </CustomText>
+                        </Animated.View>
+                        <Animated.View style={{ position: 'absolute', left: 0, opacity: opacityClose }}>
+                          <CustomText style={{ color: Colors.primary.blue500, fontFamily: 'Barlow-Bold', fontSize: 13 }}>
+                            {locale === 'id' ? 'Sembunyikan Pengecekan' : 'Hide Checks'}
+                          </CustomText>
+                        </Animated.View>
+                      </View>
+                    </View>
+                    <Animated.View style={{ transform: [{ rotate: subChevronRotation }] }}>
+                      <Ionicons 
+                        name="chevron-down" 
+                        size={16} 
+                        color={Colors.primary.blue500} 
+                      />
+                    </Animated.View>
+                  </TouchableOpacity>
+
+                  {/* Expandable Content (Layered/stacked folder tab style) */}
+                  <Animated.View style={{ height: animatedSubHeight, overflow: 'hidden', zIndex: 1 }}>
+                    <View 
+                      onLayout={(e) => {
+                        const h = e.nativeEvent.layout.height;
+                        if (h > 0 && Math.abs(h - subListHeight) > 1) {
+                          setSubListHeight(h);
+                        }
+                      }}
+                      style={{ position: 'absolute', width: '100%', top: 0, left: 0 }}
+                    >
+                      <View style={{ 
+                        marginTop: -6, 
+                        marginHorizontal: 12, 
+                        backgroundColor: isDark ? 'rgba(30,41,59,0.45)' : Colors.light.background, 
+                        borderColor: theme.border, 
+                        borderWidth: 1.2, 
+                        borderTopWidth: 0,
+                        borderBottomLeftRadius: 12,
+                        borderBottomRightRadius: 12,
+                        borderTopLeftRadius: 0,
+                        borderTopRightRadius: 0,
+                        paddingTop: 18,
+                        paddingBottom: 14,
+                        paddingHorizontal: 14, 
+                        gap: 12,
+                        elevation: 1,
+                      }}>
+                        {item.checksheet.map((pointObj) => (
+                          <View key={pointObj.templateId} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                            <Ionicons 
+                              name={pointObj.passed ? "checkmark" : "close"} 
+                              size={16} 
+                              color={pointObj.passed ? Colors.semantic.success.main : Colors.semantic.error.main} 
+                              style={{ marginTop: 2 }}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <CustomText style={{ color: pointObj.passed ? theme.text.secondary : theme.text.primary, fontSize: 13, fontFamily: 'Barlow-Medium' }}>
+                                {t(`checksheet.${pointObj.templateId.toLowerCase()}`) || pointObj.point}
+                              </CustomText>
+                              {!pointObj.passed && pointObj.note && (
+                                <CustomText style={{ color: Colors.semantic.error.main, fontSize: 11, fontFamily: 'Barlow-Medium', fontStyle: 'italic', marginTop: 2 }}>
+                                  Minus: {pointObj.note}
+                                </CustomText>
+                              )}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </Animated.View>
+                </AccordionSection>
+              </>
+            );
+          })()}
+
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
           {/* Deskripsi */}
@@ -466,7 +830,7 @@ export default function DetailScreen({ route, navigation }) {
             </>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ==================== STICKY BOTTOM BAR ==================== */}
       <View style={[
@@ -539,10 +903,10 @@ export default function DetailScreen({ route, navigation }) {
                 );
               })}
 
-              {/* Bookmark Icon */}
+              {/* Cart Icon */}
               <Animated.View style={{ transform: [{ scale: bookmarkScaleAnim }] }}>
-                <MaterialIcons
-                  name={isFavorite ? 'bookmark' : 'bookmark-border'}
+                <Ionicons
+                  name={isFavorite ? 'cart' : 'cart-outline'}
                   size={22}
                   color={isFavorite ? Colors.primary.yellow500 : theme.text.secondary}
                 />
@@ -553,10 +917,10 @@ export default function DetailScreen({ route, navigation }) {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleContactSeller}
-              style={[styles.ctaBtn, { flex: 1, backgroundColor: '#25D366' }]}
+              style={[styles.ctaBtn, { flex: 1, backgroundColor: Colors.semantic.whatsapp }]}
             >
-              <Ionicons name="logo-whatsapp" size={20} color="#FFF" style={{ marginRight: 8 }} />
-              <CustomText style={[styles.ctaBtnText, { color: '#FFF' }]}>Hubungi via WA</CustomText>
+              <Ionicons name="logo-whatsapp" size={20} color={Colors.common.white} style={{ marginRight: 8 }} />
+              <CustomText style={[styles.ctaBtnText, { color: Colors.common.white }]}>{locale === 'id' ? 'Hubungi via WA' : 'Contact via WA'}</CustomText>
             </TouchableOpacity>
           </View>
         )}
@@ -596,18 +960,27 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  floatBtn: {
+  stickyHeader: {
     position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === 'ios' ? 104 : 88,
+    zIndex: 90,
+  },
+  headerActions: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 100,
+  },
+  actionRoundBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
   },
   thumbnailStrip: {
     position: 'absolute',
@@ -653,7 +1026,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: 'Barlow-Bold',
     fontSize: 11,
-    color: '#000',
+    color: Colors.common.black,
   },
 
   /* ---- Content Card ---- */
@@ -664,7 +1037,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 140, // Increased padding to stretch background and hide bottom shadow under floating action bar
-    shadowColor: '#000',
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -791,7 +1164,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     gap: 10,
-    shadowColor: '#000',
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.1,
     shadowRadius: 16,

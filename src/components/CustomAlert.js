@@ -1,3 +1,6 @@
+/* ==========================================
+   Custom Alert
+========================================== */
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -12,10 +15,10 @@ import CustomText from './CustomText';
 import Colors from '../constants/colors';
 
 const ALERT_TYPES = {
-  success: { icon: 'check-circle', color: '#10B981', title: 'Berhasil' },
-  warning: { icon: 'warning', color: '#F59E0B', title: 'Peringatan' },
-  danger: { icon: 'error', color: '#EF4444', title: 'Bahaya' },
-  info: { icon: 'info', color: '#2979FF', title: 'Informasi' },
+  success: { icon: 'check-circle', color: Colors.semantic.success.main, title: 'Berhasil' },
+  warning: { icon: 'warning', color: Colors.semantic.warning.main, title: 'Peringatan' },
+  danger: { icon: 'error', color: Colors.semantic.error.main, title: 'Bahaya' },
+  info: { icon: 'info', color: Colors.primary.blue500, title: 'Informasi' },
 };
 
 export default function CustomAlert({
@@ -116,7 +119,7 @@ export default function CustomAlert({
           <View style={styles.actionRow}>
             {showCancel && (
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}
+                style={[styles.button, styles.cancelButton, { backgroundColor: theme.border }]}
                 onPress={onCancel}
                 activeOpacity={0.8}
               >
@@ -134,7 +137,7 @@ export default function CustomAlert({
               onPress={onConfirm}
               activeOpacity={0.8}
             >
-              <CustomText type="body-bold" style={{ color: '#FFFFFF' }}>
+              <CustomText type="body-bold" style={{ color: Colors.light.surface }}>
                 {confirmText}
               </CustomText>
             </TouchableOpacity>
@@ -162,7 +165,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.25,
     shadowRadius: 24,

@@ -1,4 +1,6 @@
-// src/services/supabase.js
+/* ==========================================
+   Supabase Client & Storage Services
+========================================== */
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -10,10 +12,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
- * Upload an image to Supabase Storage
- * @param {string} localUri - The local file URI from expo-image-picker
- * @param {string} folder - The folder to upload to (e.g., 'avatars', 'products')
- * @returns {Promise<string>} - Returns the public URL of the uploaded image
+ * uploadImageToSupabase
+ * Mengunggah gambar ke Supabase Storage.
+ * 
+ * @param {string} localUri - URI file lokal dari expo-image-picker
+ * @param {string} folder - Folder tujuan upload (contoh: 'avatars', 'products')
+ * @returns {Promise<string>} - Mengembalikan URL publik dari gambar yang diunggah
  */
 export const uploadImageToSupabase = async (localUri, folder = 'avatars') => {
   try {

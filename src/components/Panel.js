@@ -1,5 +1,6 @@
-// src/components/Panel.js
-
+/* ==========================================
+   Panel
+========================================== */
 import React from 'react';
 import { View, StyleSheet, useColorScheme } from 'react-native';
 import Colors from '../constants/colors';

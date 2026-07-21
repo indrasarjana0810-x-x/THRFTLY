@@ -1,5 +1,5 @@
 /* ==========================================
-   Redux Auth Slice
+   State Autentikasi
 ========================================== */
 import { createSlice } from '@reduxjs/toolkit';
 

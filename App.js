@@ -18,6 +18,10 @@ import AccountCenterScreen from './src/screens/AccountCenterScreen';
 import MyItemsScreen from './src/screens/MyItemsScreen';
 import PostItemScreen from './src/screens/PostItemScreen';
 import DetailScreen from './src/screens/DetailScreen';
+import CartScreen from './src/screens/CartScreen';
+import TransactionHistoryScreen from './src/screens/TransactionHistoryScreen';
+import TransactionDetailScreen from './src/screens/TransactionDetailScreen';
+import NotificationScreen from './src/screens/NotificationScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
@@ -27,6 +31,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './src/store/store';
 import { selectIsAuthenticated, setCredentials, logout } from './src/store/slices/authSlice';
+import { fetchCart } from './src/store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LanguageProvider } from './src/localization/LanguageContext';
 import api from './src/services/api';
@@ -35,7 +40,7 @@ const Stack = createNativeStackNavigator();
 
 /**
  * AppContent
- * Menangani navigasi dan logika otentikasi
+ * Menangani logika autentikasi, navigasi, dan state global awal aplikasi.
  */
 function AppContent() {
   /* ---------- Component States ---------- */
@@ -43,38 +48,63 @@ function AppContent() {
   const dispatch = useDispatch();
   const [showSplash, setShowSplash] = useState(true);
 
-  /* ---------- Auto Login Check ---------- */
+  /* ---------- Initialization (Cart & Auto Login) ---------- */
   useEffect(() => {
-    const checkLogin = async () => {
+    const initializeApp = async () => {
       try {
+
+        // Pengecekan status login otomatis
         const token = await AsyncStorage.getItem('userToken');
+        const savedProfile = await AsyncStorage.getItem('userProfile');
+        
         if (token) {
+          // Mengembalikan sesi langsung dari penyimpanan lokal agar lebih cepat
+          if (savedProfile) {
+            try {
+              dispatch(setCredentials({ token, user: JSON.parse(savedProfile) }));
+            } catch (e) {}
+          } else {
+            dispatch(setCredentials({ token, user: null }));
+          }
+
+          // Memverifikasi dan memperbarui profil dari backend secara senyap
           try {
-            // Ambil data profil dari backend menggunakan token yang ada di AsyncStorage
             const profileResponse = await api.users.getProfile();
-            const userProfile = {
-              nim: profileResponse.idUser,
-              idUser: profileResponse.idUser,
-              name: profileResponse.name,
-              email: profileResponse.email,
-              phone: profileResponse.phone,
-              studyProgram: profileResponse.studyProgram,
-              profileUrl: profileResponse.profileUrl,
-              role: profileResponse.role,
-            };
-            dispatch(setCredentials({ token, user: userProfile }));
+            if (profileResponse && (parseInt(profileResponse.status) === 200) && profileResponse.data) {
+              const userData = profileResponse.data;
+              const userProfile = {
+                nim: userData.idUser,
+                idUser: userData.idUser,
+                name: userData.name,
+                email: userData.email,
+                phone: userData.phone,
+                studyProgram: userData.studyProgram,
+                profileUrl: userData.profileUrl,
+                role: userData.role,
+              };
+              await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
+              dispatch(setCredentials({ token, user: userProfile }));
+            }
           } catch (apiError) {
-            console.log("Token expired atau error mengambil profil:", apiError);
-            await AsyncStorage.removeItem('userToken');
-            dispatch(logout());
+            console.log("Error memverifikasi profil saat init:", apiError);
+            if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
+              await AsyncStorage.removeItem('userToken');
+              await AsyncStorage.removeItem('userProfile');
+              dispatch(logout());
+            }
           }
         }
+
+        // Memuat data keranjang dari backend
+        dispatch(fetchCart());
+        
       } catch (e) {
-        console.log("Gagal cek token", e);
+        console.log("Gagal inisialisasi aplikasi:", e);
       }
     };
-    checkLogin();
+    initializeApp();
   }, [dispatch]);
+
 
   /* ---------- Theme & Assets ---------- */
   const colorScheme = useColorScheme();
@@ -125,6 +155,10 @@ function AppContent() {
                 <Stack.Screen name="MyItems" component={MyItemsScreen} />
                 <Stack.Screen name="PostItem" component={PostItemScreen} />
                 <Stack.Screen name="Detail" component={DetailScreen} />
+                <Stack.Screen name="Cart" component={CartScreen} />
+                <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
+                <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
+                <Stack.Screen name="Notification" component={NotificationScreen} />
               </>
             ) : (
               <>
@@ -159,6 +193,7 @@ function AppContent() {
           </Stack.Navigator>
         </NavigationContainer>
         {showSplash && (
+          // Handler timer tampilan splash screen awal
           <SplashScreen onFinish={() => setShowSplash(false)} darkMode={isDark} />
         )}
       </View>

@@ -1,16 +1,19 @@
+/* ==========================================
+   Sistem Gaya Visual & Bayangan (Shadows)
+========================================== */
 import { Platform, StyleSheet } from 'react-native';
 import Colors from './colors';
 
 export const Shadows = {
   light: {
-    shadowColor: '#000000',
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
   medium: {
-    shadowColor: '#000000',
+    shadowColor: Colors.common.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 6,

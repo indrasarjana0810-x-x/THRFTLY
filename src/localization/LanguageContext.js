@@ -36,10 +36,9 @@ export const LanguageProvider = ({ children }) => {
   }, []);
 
   /* ---------- Action Handlers ---------- */
-  // Fungsi t (translate) untuk mengambil kata dari file JSON
   const t = (key) => {
-    // Mendukung nested key seperti "home.title" (opsional, tapi karena di JSON kita pakai flat key "home.title", bisa langsung diakses)
-    return translations[locale][key] || key;
+    // Return null instead of key so that inline fallbacks (e.g., t('key') || 'Default') work properly
+    return translations[locale]?.[key] || null;
   };
 
   // Fungsi untuk mengganti bahasa secara instan (Real-time update) dan menyimpannya

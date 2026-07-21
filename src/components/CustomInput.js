@@ -1,5 +1,6 @@
-// src/components/CustomInput.js
-
+/* ==========================================
+   Custom Input
+========================================== */
 import React, {
   useState,
   forwardRef,
@@ -17,6 +18,10 @@ import {
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/colors";
 
+/**
+ * CustomInput
+ * Komponen input form yang dapat digunakan ulang dengan dukungan ikon, multiline, dan validasi error.
+ */
 const CustomInput = forwardRef(
   (
     {
@@ -74,7 +79,7 @@ const CustomInput = forwardRef(
     const inputWrapperStyle = [
       styles.inputWrapper,
       {
-        backgroundColor: isDark ? "#0F0F1A" : "#F9FAFB",
+        backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
         borderColor: error ? Colors.semantic.error.main : theme.border,
       },
       isFocused && {

@@ -1,9 +1,14 @@
-// src/components/CustomText.js
-
+/* ==========================================
+   Custom Text
+========================================== */
 import React from 'react';
 import { Text, StyleSheet, useColorScheme } from 'react-native';
 import Colors from '../constants/colors';
 
+/**
+ * CustomText
+ * Komponen teks utama dengan dukungan tipografi yang telah ditentukan (Heading, Body, Caption).
+ */
 export default function CustomText({
   children,
   type = 'body', // h1 | h2 | h3 | body | body-bold | caption | caption-bold  //
