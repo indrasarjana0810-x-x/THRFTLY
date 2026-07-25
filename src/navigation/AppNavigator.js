@@ -1,7 +1,7 @@
 /* ==========================================
    App Navigator (Root)
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MainTabNavigator from './MainTabNavigator';
@@ -12,15 +12,15 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 const Stack = createNativeStackNavigator();
 
 /**
- * AppNavigator
+ * AppNavigator  
  * Mengatur alur navigasi utama aplikasi (Stack Navigation).
  * Skrip ini disiapkan untuk membersihkan (refactor) App.js di masa depan.
  */
 export default function AppNavigator({ isLoggedIn }) {
-  /* ---------- Render ---------- */
+  /* ---------- Tampilan ---------- */
   return (
-    <Stack.Navigator 
-      screenOptions={{ 
+    <Stack.Navigator
+      screenOptions={{
         headerShown: false,
         animation: 'fade_from_bottom',
       }}

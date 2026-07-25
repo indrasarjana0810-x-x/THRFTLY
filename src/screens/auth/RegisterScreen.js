@@ -1,7 +1,7 @@
 /* ==========================================
-   Register Screen Component
+   Komponen Layar Daftar
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -30,27 +30,25 @@ import api from "../../services/api";
 import { useToast } from "../../components/Toast";
 import { useLanguage } from "../../localization/LanguageContext";
 
-const STUDY_PROGRAMS = [
-  "Teknologi Rekayasa Pemeliharaan Alat Berat",
-  "Teknologi Rekayasa Logistik",
-  "Teknologi Rekayasa Perangkat Lunak",
-  "Pembuatan Peralatan dan Perkakas Produksi",
-  "Teknik Produksi dan Proses Manufaktur",
-  "Teknologi Konstruksi Bangunan Gedung",
-  "Mesin Otomotif",
-  "Mekatronika",
-  "Manajemen Informatika",
+const STUDY_PROGRAM_KEYS = [
+  { key: 'prodi.tr_alat_berat', dbValue: 'Teknologi Rekayasa Pemeliharaan Alat Berat' },
+  { key: 'prodi.tr_logistik', dbValue: 'Teknologi Rekayasa Logistik' },
+  { key: 'prodi.tr_rpl', dbValue: 'Teknologi Rekayasa Perangkat Lunak' },
+  { key: 'prodi.perkakas_produksi', dbValue: 'Pembuatan Peralatan dan Perkakas Produksi' },
+  { key: 'prodi.proses_manufaktur', dbValue: 'Teknik Produksi dan Proses Manufaktur' },
+  { key: 'prodi.konstruksi_gedung', dbValue: 'Teknologi Konstruksi Bangunan Gedung' },
+  { key: 'prodi.mesin_otomotif', dbValue: 'Mesin Otomotif' },
+  { key: 'prodi.mekatronika', dbValue: 'Mekatronika' },
+  { key: 'prodi.manajemen_informatika', dbValue: 'Manajemen Informatika' },
 ];
-
-const UNIQUE_STUDY_PROGRAMS = [...new Set(STUDY_PROGRAMS)];
 
 /**
  * RegisterScreen
  * Halaman pendaftaran mahasiswa baru.
  * Dilengkapi dengan validasi multi-step (Akun & Profil).
  */
-export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess }) {
-  /* ---------- Component States & Refs ---------- */
+export default function RegisterScreen({ navigation }) {
+  /* ---------- State & Ref Komponen ---------- */
   const { showToast } = useToast();
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
@@ -67,19 +65,24 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
   const [loading, setLoading] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
   const step1X = useRef(new Animated.Value(0)).current;
   const step2X = useRef(new Animated.Value(500)).current;
   const checkPop1 = useRef(new Animated.Value(1)).current;
   const shiftAnim = useRef(new Animated.Value(0)).current;
+  
+  // Animasi Sukses Pembayaran
+  const bgScale = useRef(new Animated.Value(0)).current;
+  const shortArmWidth = useRef(new Animated.Value(0)).current;
+  const longArmHeight = useRef(new Animated.Value(0)).current;
 
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
   const phoneRef = useRef(null);
   const scrollRef = useRef(null);
 
-  /* ---------- Lifecycle & Animations ---------- */
+  /* ---------- Siklus Hidup & Animasi ---------- */
   useEffect(() => {
     const showSubscription = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -110,6 +113,36 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
       hideSubscription.remove();
     };
   }, [shiftAnim]);
+
+  useEffect(() => {
+    if (successModalVisible) {
+      bgScale.setValue(0);
+      shortArmWidth.setValue(0);
+      longArmHeight.setValue(0);
+
+      Animated.parallel([
+        Animated.spring(bgScale, {
+          toValue: 1,
+          tension: 80,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(80),
+          Animated.timing(shortArmWidth, {
+            toValue: 24,
+            duration: 70,
+            useNativeDriver: false,
+          }),
+          Animated.timing(longArmHeight, {
+            toValue: 40,
+            duration: 110,
+            useNativeDriver: false,
+          })
+        ])
+      ]).start();
+    }
+  }, [successModalVisible, bgScale, shortArmWidth, longArmHeight]);
 
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -160,7 +193,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
     }
   }, [step]);
 
-  /* ---------- Authentication Logic ---------- */
+  /* ---------- Logika Autentikasi ---------- */
   const handleNextStep1 = () => {
     setErrors({});
     let localErrors = {};
@@ -232,17 +265,13 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
       });
 
       if (parseInt(data.status) === 201) {
-        const serverMsg = data.message;
-        showToast(t(`api.${serverMsg}`) || t('auth.register_success') || "Pendaftaran Berhasil! Silakan masuk.", "success");
-        if (onRegisterSuccess) {
-          onRegisterSuccess();
-        }
+        setSuccessModalVisible(true);
       } else {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.register_failed') || "Gagal melakukan registrasi", "danger");
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = t('auth.server_error') || "Gagal terhubung ke server Spring Boot Anda.";
       if (err.response && err.response.data) {
         let rawCode = err.response.data.message || err.response.data.error;
@@ -254,11 +283,8 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
     }
   };
 
-  const filteredPrograms = UNIQUE_STUDY_PROGRAMS.filter((program) =>
-    program.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-  /* ---------- Render ---------- */
+  /* ---------- Tampilan ---------- */
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
@@ -509,7 +535,7 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
 
               <View style={styles.loginWrapper}>
                 <Text style={styles.loginLabel}>{t('auth.have_account') || "Sudah punya akun?"}</Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToLogin}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Login')}>
                   <Text style={styles.loginLink}>{t('auth.login_now') || "Masuk Sekarang"}</Text>
                 </TouchableOpacity>
               </View>
@@ -522,9 +548,9 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         title={t('auth.study_program_title') || "Pilih Program Studi"}
-        options={UNIQUE_STUDY_PROGRAMS.map(prog => ({ id: prog, label: prog }))}
+        options={STUDY_PROGRAM_KEYS.map(prog => ({ id: prog.dbValue, label: t(prog.key) || prog.dbValue }))}
         onSelect={(selectedOption) => {
-          setStudyProgram(selectedOption.label);
+          setStudyProgram(selectedOption.id);
           setModalVisible(false);
           if (errors.studyProgram) {
             setErrors((prev) => ({ ...prev, studyProgram: null }));
@@ -533,11 +559,50 @@ export default function RegisterScreen({ onNavigateToLogin, onRegisterSuccess })
         searchable={true}
         searchPlaceholder={t('auth.search_study_program') || "Cari program studi..."}
       />
+
+      {/* Success Modal */}
+      <Modal
+        visible={successModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successIconWrapper}>
+              <Animated.View style={[styles.successIconBg, { transform: [{ scale: bgScale }] }]}>
+                {/* DRAW-ITSELF CHECKMARK */}
+                <View style={styles.drawCheckContainer}>
+                  {/* Lengan Pendek (Kiri bawah ke vertex) */}
+                  <Animated.View style={[styles.drawCheckShort, { width: shortArmWidth }]} />
+                  {/* Lengan Panjang (Vertex ke atas kanan) */}
+                  <Animated.View style={[styles.drawCheckLong, { height: longArmHeight }]} />
+                </View>
+              </Animated.View>
+            </View>
+            <CustomText type="h2" style={styles.successTitle}>
+              {t('auth.register_success_title') || "Pendaftaran Berhasil!"}
+            </CustomText>
+            <CustomText style={styles.successMessage}>
+              {t('auth.register_success_msg') || "Akun Anda telah berhasil dibuat. Silakan masuk untuk mulai menggunakan aplikasi."}
+            </CustomText>
+            <CustomButton
+              title={t('auth.continue_login_btn') || "Lanjut ke Login"}
+              onPress={() => {
+                setSuccessModalVisible(false);
+                navigation.navigate('Login');
+              }}
+              type="primary"
+              style={styles.successButton}
+            />
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const getStyles = (theme, isDark) => {
   return StyleSheet.create({
     safeArea: {
@@ -803,6 +868,86 @@ const getStyles = (theme, isDark) => {
       fontFamily: "Barlow-Bold",
       fontSize: 14,
       color: Colors.primary.blue500,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+      zIndex: 1000,
+    },
+    successModalContent: {
+      width: "100%",
+      backgroundColor: theme.surface,
+      borderRadius: 24,
+      padding: 32,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    successIconWrapper: {
+      marginBottom: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      height: 80,
+    },
+    successIconBg: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: Colors.semantic.success.main,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: Colors.semantic.success.main,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    drawCheckContainer: {
+      width: 24,
+      height: 40,
+      transform: [{ rotate: "45deg" }],
+      marginTop: -5,
+      marginLeft: -5,
+    },
+    drawCheckShort: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      height: 5,
+      backgroundColor: Colors.light.surface,
+      borderRadius: 3,
+    },
+    drawCheckLong: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 5,
+      backgroundColor: Colors.light.surface,
+      borderRadius: 3,
+    },
+    successTitle: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 22,
+      color: theme.text.primary,
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    successMessage: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
+      color: theme.text.secondary,
+      textAlign: "center",
+      marginBottom: 32,
+      lineHeight: 22,
+    },
+    successButton: {
+      width: "100%",
     }
   });
 };

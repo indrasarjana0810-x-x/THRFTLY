@@ -1,5 +1,5 @@
 /* ==========================================
-   Range Slider
+   Komponen Layar Range Slider
 ========================================== */
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, PanResponder } from 'react-native';

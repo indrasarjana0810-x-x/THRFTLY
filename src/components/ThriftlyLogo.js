@@ -1,5 +1,5 @@
 /* ==========================================
-   Thriftly Logo
+   Komponen Layar Thriftly Logo
 ========================================== */
 // Thriftly Official SVG Logo Component (Generated from NoText.svg)
 

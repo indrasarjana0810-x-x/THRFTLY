@@ -1,5 +1,5 @@
 /* ==========================================
-   Komponen Layar Beranda
+   Komponen Layar Komponen Layar Beranda
 ========================================== */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -18,10 +18,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Image,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { selectAuthUser } from '../store/slices/authSlice';
 import Colors from '../constants/colors';
@@ -37,7 +36,7 @@ import * as Location from 'expo-location';
 import api from '../services/api';
 
 /* ==========================================
-   Data Dummy (Khusus Mahasiswa)
+   Komponen Layar Data Dummy (Khusus Mahasiswa)
 ========================================== */
 
 const SMART_FILTERS = [
@@ -50,7 +49,7 @@ const SMART_FILTERS = [
 // Data dummy LATEST_ITEMS telah dihapus
 
 /* ==========================================
-   Komponen Layar Utama
+   Komponen Layar Komponen Layar Utama
 ========================================== */
 /**
  * HomeScreen
@@ -73,10 +72,7 @@ export default function HomeScreen({ navigation, onLogout }) {
   const [activeSmartFilter, setActiveSmartFilter] = useState('semua');
   const [userLocation, setUserLocation] = useState(null);
   const [locationPermAlertVisible, setLocationPermAlertVisible] = useState(false);
-
-  // Filter lokal dihapus, sekarang menggunakan filter dan urutan dari server
-  // melalui useEffect yang memantau perubahan activeSmartFilter
-
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadItems = useCallback(async (isLoadMore = false, isRefreshing = false) => {
     if (loadingMore) return;
@@ -127,7 +123,7 @@ export default function HomeScreen({ navigation, onLogout }) {
         setTotalPages(res.data.totalPages || 1);
       }
     } catch (error) {
-      console.warn('Error loading items from API:', error);
+      void 0;
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -135,11 +131,19 @@ export default function HomeScreen({ navigation, onLogout }) {
     }
   }, [activeSmartFilter, userLocation, page, totalPages, loadingMore]);
 
-  useEffect(() => {
-    setLoading(true);
-    setItems([]);
-    loadItems(false);
-  }, [activeSmartFilter, userLocation]); // Memuat ulang data barang ketika filter atau lokasi berubah
+  // Auto refresh data & notifications whenever the screen comes into focus (e.g. back from DetailScreen)
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        api.notifications.get().then(res => {
+          if (res && parseInt(res.status) === 200 && res.data) {
+            setUnreadCount(res.data.unreadCount || 0);
+          }
+        }).catch(err => void 0);
+      }
+      loadItems(false);
+    }, [user, activeSmartFilter, userLocation])
+  );
 
   useEffect(() => {
     // Memeriksa izin lokasi saat aplikasi dimuat agar ProductCard dapat menampilkan jarak yang akurat
@@ -157,7 +161,7 @@ export default function HomeScreen({ navigation, onLogout }) {
           setLocationPermAlertVisible(true);
         }
       } catch (error) {
-        console.warn('Error checking location permission:', error);
+        void 0;
       }
     })();
   }, []); // Hanya dijalankan sekali saat komponen dimuat
@@ -179,7 +183,7 @@ export default function HomeScreen({ navigation, onLogout }) {
           setLocationPermAlertVisible(true);
         }
       } catch (e) {
-        console.warn('Error handling location filter:', e);
+        void 0;
         setActiveSmartFilter('semua');
       }
     } else {
@@ -200,16 +204,14 @@ export default function HomeScreen({ navigation, onLogout }) {
       } else {
         if (!canAskAgain) {
           Alert.alert(
-            locale === 'id' ? 'Akses Lokasi Ditolak' : 'Location Access Denied',
-            locale === 'id' 
-              ? 'Izin lokasi dinonaktifkan di Pengaturan HP Anda. Silakan izinkan akses lokasi melalui Pengaturan Perangkat.' 
-              : 'Location permission is disabled in your device Settings. Please enable location access in Device Settings.',
+            t('home.loc_denied_title'),
+            t('home.loc_denied_msg'),
             [{ text: 'OK' }]
           );
         }
       }
     } catch (error) {
-      console.warn('Error requesting location permission:', error);
+      void 0;
     }
   };
 
@@ -260,9 +262,11 @@ export default function HomeScreen({ navigation, onLogout }) {
               color={isDark ? Colors.light.surface : Colors.primary.blue500}
             />
             {/* Notification counter badge */}
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>3</Text>
-            </View>
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -346,10 +350,9 @@ export default function HomeScreen({ navigation, onLogout }) {
           </View>
         ) : items.length === 0 ? (
           <EmptyState
-            title={t('home.empty_recommended_title') || (locale === 'id' ? 'Belum Ada Rekomendasi' : 'No Recommendations')}
-            description={t('home.empty_recommended_desc') || (locale === 'id' ? 'Belum ada rekomendasi barang dari pengguna lain saat ini.' : 'No recommended items from other users at the moment.')}
+            title={t('home.empty_recommended_title')}
+            description={t('home.empty_recommended_desc')}
             icon="inbox"
-            style={{ marginTop: 40, marginBottom: 40 }}
           />
         ) : (
           <View style={styles.masonryContainer}>
@@ -393,15 +396,11 @@ export default function HomeScreen({ navigation, onLogout }) {
       <CustomAlert
         visible={locationPermAlertVisible}
         type="info"
-        title={locale === 'id' ? 'Izin Akses Lokasi' : 'Location Access Permission'}
-        message={
-          locale === 'id' 
-            ? 'Aplikasi membutuhkan akses lokasi Anda untuk menampilkan produk dan tempat COD di sekitar Anda. Lanjutkan?' 
-            : 'The app needs location access to display products and COD spots near you. Continue?'
-        }
+        title={t('home.loc_perm_title')}
+        message={t('home.loc_perm_msg')}
         showCancel
-        confirmText={locale === 'id' ? 'Izinkan' : 'Allow'}
-        cancelText={locale === 'id' ? 'Tolak' : 'Deny'}
+        confirmText={t('common.allow')}
+        cancelText={t('common.deny')}
         onConfirm={handleConfirmLocationPermission}
         onCancel={() => setLocationPermAlertVisible(false)}
         onClose={() => setLocationPermAlertVisible(false)}
@@ -411,7 +410,7 @@ export default function HomeScreen({ navigation, onLogout }) {
 }
 
 /* ==========================================
-   Styles
+   Komponen Layar Styles
 ========================================== */
 
 const getStyles = (theme, isDark) => {
@@ -424,6 +423,7 @@ const getStyles = (theme, isDark) => {
       flex: 1,
     },
     scrollContent: {
+      flexGrow: 1,
       paddingBottom: 20,
     },
     header: {
@@ -532,7 +532,7 @@ const getStyles = (theme, isDark) => {
     masonryColumn: {
       width: '48%', // Memberi ruang buat gap di tengah
     },
-    /* Custom Permission Modal Styles */
+    /* ---------- Gaya Modal Izin Khusus ---------- */
     permissionOverlay: {
       flex: 1,
       justifyContent: 'center',

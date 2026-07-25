@@ -1,5 +1,5 @@
 /* ==========================================
-   Account Center Screen Component
+   Komponen Layar Komponen Account Center
 ========================================== */
 /**
  * AccountCenterScreen
@@ -78,7 +78,7 @@ export default function AccountCenterScreen({ navigation }) {
       });
       processImageResult(result);
     } catch (error) {
-      console.log('Error opening camera:', error);
+      void 0;
     }
   };
 
@@ -98,7 +98,7 @@ export default function AccountCenterScreen({ navigation }) {
       });
       processImageResult(result);
     } catch (error) {
-      console.log('Error opening gallery:', error);
+      void 0;
     }
   };
 
@@ -144,7 +144,7 @@ export default function AccountCenterScreen({ navigation }) {
           }));
         }
       } catch (error) {
-        console.log(error);
+        void 0;
         showToast('Gagal mengubah foto profil.', 'danger');
       } finally {
         setIsUploading(false);
@@ -209,7 +209,7 @@ export default function AccountCenterScreen({ navigation }) {
         showToast(data.message || t('common.error') || 'Gagal menyimpan perubahan', 'danger');
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = t('auth.toast_server_error') || 'Terjadi kesalahan jaringan.';
       if (err.response && err.response.data) {
         errMsg = err.response.data.message || errMsg;
@@ -252,7 +252,7 @@ export default function AccountCenterScreen({ navigation }) {
         showToast(data.message || t('auth.toast_password_update_failed') || 'Gagal mengubah kata sandi', 'danger');
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = t('auth.toast_server_error') || 'Terjadi kesalahan jaringan.';
       if (err.response && err.response.data) {
         errMsg = err.response.data.message || errMsg;

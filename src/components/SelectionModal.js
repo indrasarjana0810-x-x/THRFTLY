@@ -1,5 +1,5 @@
 /* ==========================================
-   Selection Modal
+   Komponen Layar Selection Modal
 ========================================== */
 import React, { useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   ScrollView,
   useColorScheme,
+  Keyboard,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import CustomText from './CustomText';
@@ -72,6 +73,7 @@ export default function SelectionModal({
                   activeOpacity={0.7}
                   style={[styles.modalOption, { borderBottomColor: theme.border }]}
                   onPress={() => {
+                    Keyboard.dismiss();
                     setSearchQuery('');
                     onSelect(option);
                   }}
@@ -93,6 +95,7 @@ export default function SelectionModal({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => {
+              Keyboard.dismiss();
               setSearchQuery('');
               onClose();
             }}

@@ -1,7 +1,7 @@
 /* ==========================================
-   Segmented Control Component
+   Komponen Layar Komponen Segmented Control
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -94,7 +94,7 @@ export default function SegmentedControl({
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const styles = StyleSheet.create({
   segmentWrapper: {
     flexDirection: 'row',

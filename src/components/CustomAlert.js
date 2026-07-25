@@ -1,5 +1,5 @@
 /* ==========================================
-   Custom Alert
+   Komponen Layar Custom Alert
 ========================================== */
 import React, { useEffect, useRef } from 'react';
 import {

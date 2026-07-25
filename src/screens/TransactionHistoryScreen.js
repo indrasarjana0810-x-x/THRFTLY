@@ -1,7 +1,8 @@
 /* ==========================================
    Transaction History Screen — Buyer & Seller Tabbed View
    ========================================== */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   StyleSheet,
@@ -40,6 +41,14 @@ export default function TransactionHistoryScreen({ navigation }) {
   const [sellerTrans, setSellerTrans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [buyerPage, setBuyerPage] = useState(0);
+  const [buyerTotalPages, setBuyerTotalPages] = useState(1);
+  const [buyerLoadingMore, setBuyerLoadingMore] = useState(false);
+
+  const [sellerPage, setSellerPage] = useState(0);
+  const [sellerTotalPages, setSellerTotalPages] = useState(1);
+  const [sellerLoadingMore, setSellerLoadingMore] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({
     type: 'info',
@@ -62,69 +71,133 @@ export default function TransactionHistoryScreen({ navigation }) {
     setAlertVisible(true);
   };
 
-  const fetchTransactions = async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
-    try {
-      const [buyerRes, sellerRes] = await Promise.all([
-        api.transaction.getBuyerTransactions(),
-        api.transaction.getSellerTransactions(),
-      ]);
+  const fetchTransactions = useCallback(async (isLoadMore = false, isRefreshing = false) => {
+    if (isLoadMore) {
+      const isBuyer = activeTab === 'buyer';
+      const loadingMore = isBuyer ? buyerLoadingMore : sellerLoadingMore;
+      const page = isBuyer ? buyerPage : sellerPage;
+      const totalPages = isBuyer ? buyerTotalPages : sellerTotalPages;
+      
+      if (loadingMore || page + 1 >= totalPages) return;
 
-      if (buyerRes && parseInt(buyerRes.status) === 200) {
-        setBuyerTrans(buyerRes.data || []);
+      if (isBuyer) setBuyerLoadingMore(true);
+      else setSellerLoadingMore(true);
+
+      try {
+        if (isBuyer) {
+          const res = await api.transaction.getBuyerTransactions({ page: page + 1, size: 10 });
+          if (res && parseInt(res.status) === 200 && res.data) {
+            setBuyerTrans(prev => [...prev, ...(res.data.content || res.data || [])]);
+            setBuyerPage(res.data.currentPage || 0);
+            setBuyerTotalPages(res.data.totalPages || 1);
+          }
+        } else {
+          const res = await api.transaction.getSellerTransactions({ page: page + 1, size: 10 });
+          if (res && parseInt(res.status) === 200 && res.data) {
+            setSellerTrans(prev => [...prev, ...(res.data.content || res.data || [])]);
+            setSellerPage(res.data.currentPage || 0);
+            setSellerTotalPages(res.data.totalPages || 1);
+          }
+        }
+      } catch (err) {
+        showToast(t('common.error'), 'danger');
+      } finally {
+        if (isBuyer) setBuyerLoadingMore(false);
+        else setSellerLoadingMore(false);
       }
-      if (sellerRes && parseInt(sellerRes.status) === 200) {
-        setSellerTrans(sellerRes.data || []);
+    } else {
+      // Initial or refresh load (fetch both)
+      if (isRefreshing) setRefreshing(true);
+      else setLoading(true);
+
+      setBuyerPage(0);
+      setSellerPage(0);
+
+      try {
+        const [buyerRes, sellerRes] = await Promise.all([
+          api.transaction.getBuyerTransactions({ page: 0, size: 10 }),
+          api.transaction.getSellerTransactions({ page: 0, size: 10 }),
+        ]);
+
+        if (buyerRes && parseInt(buyerRes.status) === 200) {
+          setBuyerTrans(buyerRes.data.content || buyerRes.data || []);
+          setBuyerPage(buyerRes.data.currentPage || 0);
+          setBuyerTotalPages(buyerRes.data.totalPages || 1);
+        }
+        if (sellerRes && parseInt(sellerRes.status) === 200) {
+          setSellerTrans(sellerRes.data.content || sellerRes.data || []);
+          setSellerPage(sellerRes.data.currentPage || 0);
+          setSellerTotalPages(sellerRes.data.totalPages || 1);
+        }
+      } catch (err) {
+        void 0;
+        showToast(t('common.error'), 'danger');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (err) {
-      console.log('Error fetching history:', err);
-      showToast(locale === 'id' ? 'Gagal memuat riwayat transaksi' : 'Failed to load transaction history', 'danger');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [activeTab, buyerLoadingMore, sellerLoadingMore, buyerPage, sellerPage, buyerTotalPages, sellerTotalPages]);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchTransactions(false, false);
+    }, [])
+  );
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchTransactions(true);
-  };
+  const handleRefresh = useCallback(() => {
+    fetchTransactions(false, true);
+  }, [fetchTransactions]);
 
   const handleUpdateStatus = async (transId, newStatus) => {
     try {
       const res = await api.transaction.updateStatus(transId, newStatus);
       if (res && parseInt(res.status) === 200) {
-        showToast(
-          locale === 'id' ? 'Status transaksi berhasil diperbarui' : 'Transaction status updated successfully',
-          'success'
-        );
         fetchTransactions(true);
+        try {
+          const { triggerLocalNotification } = require('../utils/notificationHelper');
+          let notifTitle = t('history.notif_update_title') || 'Update Transaksi';
+          let notifMsg = t('history.notif_update_msg') || 'Status transaksi berhasil diperbarui.';
+          if (newStatus === 'Accepted') {
+            notifTitle = t('history.notif_accepted_title') || 'Pesanan Diterima';
+            notifMsg = t('history.notif_accepted_msg') || 'Anda telah menerima pesanan COD ini.';
+          } else if (newStatus === 'Rejected') {
+            notifTitle = t('history.notif_rejected_title') || 'Pesanan Ditolak';
+            notifMsg = t('history.notif_rejected_msg') || 'Anda telah menolak pesanan COD ini.';
+          } else if (newStatus === 'Cancelled') {
+            notifTitle = t('history.notif_cancelled_title') || 'Pesanan Dibatalkan';
+            notifMsg = t('history.notif_cancelled_msg') || 'Pesanan COD telah dibatalkan.';
+          } else if (newStatus === 'Completed') {
+            notifTitle = t('history.notif_completed_title') || 'Transaksi Selesai';
+            notifMsg = t('history.notif_completed_msg') || 'Transaksi COD telah dinyatakan selesai.';
+          }
+          triggerLocalNotification(notifTitle, notifMsg);
+        } catch (e) {}
       } else {
-        showToast(res.message || 'Gagal memperbarui transaksi', 'danger');
+        showToast(res.message || t('history.update_fail') || 'Gagal memperbarui transaksi', 'danger');
       }
     } catch (err) {
-      console.log('Error updating status:', err);
-      showToast(locale === 'id' ? 'Gagal terhubung ke server' : 'Failed to connect to server', 'danger');
+      void 0;
+      showToast(t('auth.server_error'), 'danger');
     }
   };
 
   const handleContactWA = (partnerName, partnerPhone, items, total) => {
     if (!partnerPhone) {
-      showToast('Nomor telepon tidak tersedia.', 'warning');
+      showToast(t('history.no_phone') || 'Nomor telepon tidak tersedia.', 'warning');
       return;
     }
     let phone = partnerPhone.replace(/[^0-9]/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.slice(1);
 
     const itemsText = items.map((i, idx) => `${idx + 1}. ${i.item.title}`).join('\n');
-    const msg = `Halo ${partnerName},\nsaya ingin menghubungi mengenai pesanan COD di Thriftly:\n\n${itemsText}\n\n*Total:* ${formatCurrency(total)}\nBagaimana kelanjutan COD kita?`;
+    const msg = (t('history.wa_template') || 'Halo %{name},\nsaya ingin menghubungi mengenai pesanan COD di Thriftly:\n\n%{items}\n\n*Total:* %{total}\nBagaimana kelanjutan COD kita?')
+      .replace('%{name}', partnerName)
+      .replace('%{items}', itemsText)
+      .replace('%{total}', formatCurrency(total));
     
     Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`).catch(() => {
-      showToast('Gagal membuka WhatsApp', 'danger');
+      showToast(t('history.wa_fail') || 'Gagal membuka WhatsApp', 'danger');
     });
   };
 
@@ -141,11 +214,11 @@ export default function TransactionHistoryScreen({ navigation }) {
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'Pending': return locale === 'id' ? 'Menunggu' : 'Pending';
-      case 'Accepted': return locale === 'id' ? 'COD Berlangsung' : 'Accepted (COD)';
-      case 'Completed': return locale === 'id' ? 'Selesai' : 'Completed';
-      case 'Rejected': return locale === 'id' ? 'Ditolak' : 'Rejected';
-      case 'Cancelled': return locale === 'id' ? 'Dibatalkan' : 'Cancelled';
+      case 'Pending': return t('status.pending') || 'Menunggu';
+      case 'Accepted': return t('status.accepted') || 'COD Berlangsung';
+      case 'Completed': return t('status.completed') || 'Selesai';
+      case 'Rejected': return t('status.rejected') || 'Ditolak';
+      case 'Cancelled': return t('status.cancelled') || 'Dibatalkan';
       default: return status;
     }
   };
@@ -187,7 +260,7 @@ export default function TransactionHistoryScreen({ navigation }) {
           <Avatar name={partner?.name} imageUrl={partner?.profile} size={36} />
           <View style={{ marginLeft: 10, flex: 1 }}>
             <CustomText style={{ color: theme.text.secondary, fontSize: 11 }}>
-              {isBuyerRole ? (locale === 'id' ? 'Penjual:' : 'Seller:') : (locale === 'id' ? 'Pembeli:' : 'Buyer:')}
+              {isBuyerRole ? (t('history.seller_label') || 'Penjual:') : (t('history.buyer_label') || 'Pembeli:')}
             </CustomText>
             <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 14 }} numberOfLines={1}>
               {partner?.name || 'User'}
@@ -201,7 +274,9 @@ export default function TransactionHistoryScreen({ navigation }) {
           backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)' 
         }]}>
           {item.details.map((detail, idx) => {
-            const mainImg = detail.item?.imageUris && detail.item.imageUris.length > 0 ? detail.item.imageUris[0] : null;
+            const mainImg = detail.item?.imageUris && detail.item.imageUris.length > 0 
+              ? detail.item.imageUris[0] 
+              : (detail.item?.image ? detail.item.image : null);
             return (
               <View key={idx} style={[styles.itemRow, idx === item.details.length - 1 && { borderBottomWidth: 0 }]}>
                 <TouchableOpacity
@@ -245,7 +320,9 @@ export default function TransactionHistoryScreen({ navigation }) {
           <View style={styles.noteBox}>
             <Ionicons name="chatbox-ellipses-outline" size={14} color={theme.text.secondary} style={{ marginRight: 6, marginTop: 1 }} />
             <CustomText style={{ color: theme.text.secondary, fontSize: 12, flex: 1, fontStyle: 'italic' }}>
-              Note COD: {item.meetingNote}
+              {item.meetingNote.toLowerCase().startsWith('note') || item.meetingNote.toLowerCase().startsWith('lokasi') || item.meetingNote.toLowerCase().startsWith('catatan')
+                ? item.meetingNote 
+                : `Catatan COD: ${item.meetingNote}`}
             </CustomText>
           </View>
         )}
@@ -264,79 +341,129 @@ export default function TransactionHistoryScreen({ navigation }) {
         {(isPending || isAccepted) && (
           <View style={[styles.actionsRow, { borderTopColor: theme.border }]}>
             {isPending && (
-              <>
+              <View style={{ flexDirection: 'row', flex: 1, gap: 10 }}>
                 {isBuyerRole ? (
-                  /* Buyer can cancel pending order */
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    style={[styles.actionBtn, styles.btnOutline, { borderColor: Colors.semantic.error.main }]}
-                    onPress={() => showAlert(
-                      'warning',
-                      locale === 'id' ? 'Batalkan Pemesanan' : 'Cancel Booking',
-                      locale === 'id' ? 'Apakah Anda yakin ingin membatalkan pemesanan ini?' : 'Are you sure you want to cancel this booking?',
-                      () => handleUpdateStatus(item.idTrans, 'Cancelled'),
-                      locale === 'id' ? 'Ya, Batal' : 'Yes, Cancel'
-                    )}
-                  >
-                    <CustomText style={[styles.btnText, { color: Colors.semantic.error.main }]}>
-                      {locale === 'id' ? 'Batalkan' : 'Cancel'}
-                    </CustomText>
-                  </TouchableOpacity>
-                ) : (
-                  /* Seller can accept or reject pending order */
-                  <View style={{ flexDirection: 'row', flex: 1, gap: 10 }}>
+                  /* ---------- Buyer can cancel pending order or WhatsApp seller ---------- */
+                  <>
                     <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[styles.actionBtn, styles.btnOutline, { flex: 1, borderColor: Colors.semantic.error.main }]}
+                      activeOpacity={0.75}
+                      style={[
+                        styles.actionBtn, 
+                        styles.btnOutline, 
+                        { 
+                          flex: 1, 
+                          borderColor: Colors.semantic.error.main,
+                          backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.06)'
+                        }
+                      ]}
+                      onPress={() => showAlert(
+                        'warning',
+                        t('history.cancel_title') || 'Batalkan Pemesanan',
+                        t('history.cancel_msg') || 'Apakah Anda yakin ingin membatalkan pemesanan ini?',
+                        () => handleUpdateStatus(item.idTrans, 'Cancelled'),
+                        t('history.yes_cancel') || 'Ya, Batal'
+                      )}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color={Colors.semantic.error.main} style={{ marginRight: 6 }} />
+                      <CustomText style={[styles.btnText, { color: Colors.semantic.error.main }]}>
+                        {t('history.btn_cancel') || 'Batalkan'}
+                      </CustomText>
+                    </TouchableOpacity>
+
+                    {partner?.phone && (
+                      <TouchableOpacity
+                        activeOpacity={0.75}
+                        style={[
+                          styles.actionBtn, 
+                          styles.btnOutline, 
+                          { 
+                            flex: 1, 
+                            borderColor: Colors.semantic.whatsapp,
+                            backgroundColor: isDark ? 'rgba(37, 211, 102, 0.12)' : 'rgba(37, 211, 102, 0.06)'
+                          }
+                        ]}
+                        onPress={() => handleContactWA(partner.name, partner.phone, item.details, item.totalTrx)}
+                      >
+                        <Ionicons name="logo-whatsapp" size={16} color={Colors.semantic.whatsapp} style={{ marginRight: 6 }} />
+                        <CustomText style={[styles.btnText, { color: Colors.semantic.whatsapp }]}>
+                          {t('history.btn_wa') || 'WhatsApp'}
+                        </CustomText>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  /* ---------- Seller can accept or reject pending order ---------- */
+                  <>
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      style={[
+                        styles.actionBtn, 
+                        styles.btnOutline, 
+                        { 
+                          flex: 1, 
+                          borderColor: Colors.semantic.error.main,
+                          backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.06)'
+                        }
+                      ]}
                       onPress={() => handleUpdateStatus(item.idTrans, 'Rejected')}
                     >
+                      <Ionicons name="close-circle-outline" size={16} color={Colors.semantic.error.main} style={{ marginRight: 6 }} />
                       <CustomText style={[styles.btnText, { color: Colors.semantic.error.main }]}>
-                        {locale === 'id' ? 'Tolak' : 'Reject'}
+                        {t('history.btn_reject') || 'Tolak'}
                       </CustomText>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      activeOpacity={0.7}
+                      activeOpacity={0.75}
                       style={[styles.actionBtn, { flex: 1, backgroundColor: Colors.primary.blue500 }]}
                       onPress={() => handleUpdateStatus(item.idTrans, 'Accepted')}
                     >
+                      <Ionicons name="checkmark-circle-outline" size={16} color={Colors.common.white} style={{ marginRight: 6 }} />
                       <CustomText style={[styles.btnText, { color: Colors.common.white }]}>
-                        {locale === 'id' ? 'Terima' : 'Accept'}
+                        {t('history.btn_accept') || 'Terima'}
                       </CustomText>
                     </TouchableOpacity>
-                  </View>
+                  </>
                 )}
-              </>
+              </View>
             )}
 
             {isAccepted && (
               <View style={{ flexDirection: 'row', flex: 1, gap: 10 }}>
                 {/* Chat Partner WA */}
                 <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[styles.actionBtn, styles.btnOutline, { flex: 1, borderColor: Colors.semantic.whatsapp }]}
+                  activeOpacity={0.75}
+                  style={[
+                    styles.actionBtn, 
+                    styles.btnOutline, 
+                    { 
+                      flex: 1, 
+                      borderColor: Colors.semantic.whatsapp,
+                      backgroundColor: isDark ? 'rgba(37, 211, 102, 0.12)' : 'rgba(37, 211, 102, 0.06)'
+                    }
+                  ]}
                   onPress={() => handleContactWA(partner.name, partner.phone, item.details, item.totalTrx)}
                 >
                   <Ionicons name="logo-whatsapp" size={16} color={Colors.semantic.whatsapp} style={{ marginRight: 6 }} />
                   <CustomText style={[styles.btnText, { color: Colors.semantic.whatsapp }]}>
-                    WhatsApp
+                    {t('history.btn_wa') || 'WhatsApp'}
                   </CustomText>
                 </TouchableOpacity>
 
                 {/* Mark as Completed */}
                 <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[styles.actionBtn, { flex: 1, backgroundColor: Colors.semantic.success.main }]}
+                  activeOpacity={0.75}
+                  style={[styles.actionBtn, { flex: 1, backgroundColor: Colors.primary.blue500 }]}
                   onPress={() => showAlert(
                     'info',
-                    locale === 'id' ? 'Transaksi Selesai' : 'Complete Transaction',
-                    locale === 'id' ? 'Apakah Anda menyatakan COD telah berhasil dan transaksi selesai?' : 'Are you stating that COD succeeded and transaction is complete?',
+                    t('history.complete_title') || 'Transaksi Selesai',
+                    t('history.complete_msg') || 'Apakah Anda menyatakan COD telah berhasil dan transaksi selesai?',
                     () => handleUpdateStatus(item.idTrans, 'Completed'),
-                    locale === 'id' ? 'Ya, Selesai' : 'Yes, Complete'
+                    t('history.yes_complete') || 'Ya, Selesai'
                   )}
                 >
-                  <Ionicons name="checkmark" size={16} color={Colors.common.white} style={{ marginRight: 4 }} />
+                  <Ionicons name="checkmark-done-circle-outline" size={17} color={Colors.common.white} style={{ marginRight: 6 }} />
                   <CustomText style={[styles.btnText, { color: Colors.common.white }]}>
-                    {locale === 'id' ? 'Selesai COD' : 'Done COD'}
+                    {t('history.btn_complete') || 'Selesai COD'}
                   </CustomText>
                 </TouchableOpacity>
               </View>
@@ -352,14 +479,14 @@ export default function TransactionHistoryScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Screen Header */}
-      <Header title={locale === 'id' ? 'Riwayat Transaksi' : 'Transaction History'} noBorder={true} />
+      <Header title={t('history.title') || 'Riwayat Transaksi'} noBorder={true} />
 
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <SegmentedControl
           tabs={[
-            { key: 'buyer', label: locale === 'id' ? 'Pemesanan Saya' : 'My Bookings' },
-            { key: 'seller', label: locale === 'id' ? 'Pesanan Masuk' : 'Incoming Orders' }
+            { key: 'buyer', label: t('history.tab_buyer') || 'Pembelian' },
+            { key: 'seller', label: t('history.tab_seller') || 'Penjualan' }
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
@@ -376,6 +503,10 @@ export default function TransactionHistoryScreen({ navigation }) {
           keyExtractor={(item) => item.idTrans}
           renderItem={renderTransactionCard}
           contentContainerStyle={styles.listContent}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={5}
+          removeClippedSubviews={true}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -384,12 +515,20 @@ export default function TransactionHistoryScreen({ navigation }) {
               tintColor={Colors.primary.blue500}
             />
           }
+          onEndReached={() => fetchTransactions(true, false)}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            (activeTab === 'buyer' ? buyerLoadingMore : sellerLoadingMore) ? (
+              <ActivityIndicator size="small" color={Colors.primary.blue500} style={{ padding: 20 }} />
+            ) : (
+              <View style={{ height: 20 }} />
+            )
+          }
           ListEmptyComponent={
             <EmptyState
-              title={locale === 'id' ? 'Tidak Ada Transaksi' : 'No Transactions'}
-              description={locale === 'id' ? 'Riwayat transaksi Anda di status ini masih kosong.' : 'Your transaction history for this tab is empty.'}
+              title={t('history.empty_title') || 'Tidak Ada Transaksi'}
+              description={t('history.empty_desc') || 'Riwayat transaksi Anda pada status ini masih kosong.'}
               icon="receipt"
-              style={{ marginTop: 60 }}
             />
           }
         />
@@ -422,6 +561,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   listContent: {
+    flexGrow: 1,
     padding: 16,
     gap: 14,
   },

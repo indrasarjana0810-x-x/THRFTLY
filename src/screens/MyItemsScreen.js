@@ -1,8 +1,8 @@
 /* ==========================================
-   MyItems Screen Component
+   Komponen Layar Komponen MyItems
 ========================================== */
-/* ---------- Imports ---------- */
-import React, { useState, useEffect, useMemo } from 'react';
+/* ---------- Impor ---------- */
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -28,6 +28,7 @@ import { Shadows } from '../constants/styles';
 import CustomText from '../components/CustomText';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
+import CustomAlert from '../components/CustomAlert';
 import ProductCard from '../components/ProductCard';
 import RangeSlider from '../components/RangeSlider';
 import CustomToggle from '../components/CustomToggle';
@@ -83,6 +84,11 @@ const MOCK_MY_ITEMS = [
 
 const TABS = ['All', 'Available', 'Booked', 'Sold'];
 
+const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }) => {
+  const paddingToBottom = 50;
+  return layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+};
+
 export default function MyItemsScreen({ navigation }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -96,6 +102,9 @@ export default function MyItemsScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
   const [sortBy, setSortBy] = useState('Newest');
   const [tempSortBy, setTempSortBy] = useState('Newest');
@@ -106,12 +115,13 @@ export default function MyItemsScreen({ navigation }) {
   const [tempMaxPrice, setTempMaxPrice] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [tempSelectedCategory, setTempSelectedCategory] = useState('All');
-  const [isStatusModalVisible, setStatusModalVisible] = useState(false);
+
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeFilterTab, setActiveFilterTab] = useState('Sort');
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
   const [masterCategories, setMasterCategories] = useState([]);
 
@@ -127,7 +137,7 @@ export default function MyItemsScreen({ navigation }) {
           setMasterCategories(mapped);
         }
       } catch (error) {
-        console.log("Error fetching master categories:", error);
+        void 0;
       }
     };
     fetchMasterCategories();
@@ -142,21 +152,52 @@ export default function MyItemsScreen({ navigation }) {
     setFilterModalVisible(true);
   };
 
-  const loadMyItems = async () => {
+  const loadMyItems = useCallback(async (isLoadMore = false, isRefreshing = false) => {
+    if (loadingMore) return;
+
+    let currentPage = 0;
+    if (isLoadMore) {
+      if (page + 1 >= totalPages) return;
+      currentPage = page + 1;
+      setLoadingMore(true);
+    } else if (isRefreshing) {
+      setRefreshing(true);
+      currentPage = 0;
+      setPage(0);
+    } else {
+      setLoading(true);
+      currentPage = 0;
+      setPage(0);
+    }
+
     try {
-      const res = await api.items.getMy();
+      const res = await api.items.getMy({ page: currentPage, size: 10 });
       if (res && parseInt(res.status) === 200 && res.data) {
-        setItems(res.data);
+        if (isLoadMore) {
+          setItems(prev => [...prev, ...(res.data.content || res.data || [])]);
+        } else {
+          setItems(res.data.content || res.data || []);
+        }
+        setPage(res.data.currentPage || 0);
+        setTotalPages(res.data.totalPages || 1);
       }
     } catch (error) {
-      console.log("Error loading my items:", error);
+      void 0;
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
+  }, [loadingMore, page, totalPages]);
+
+  const isItemDisabled = (item) => {
+    const s = item?.status?.toLowerCase();
+    return s === 'sold' || s === 'booked';
   };
 
   const handleLongPress = (id) => {
+    const targetItem = items.find(i => (i.idItem || i.id) === id);
+    if (isItemDisabled(targetItem)) return;
     setIsSelectionMode(true);
     if (!selectedItems.includes(id)) {
       setSelectedItems([...selectedItems, id]);
@@ -164,6 +205,8 @@ export default function MyItemsScreen({ navigation }) {
   };
 
   const toggleSelection = (id) => {
+    const targetItem = items.find(i => (i.idItem || i.id) === id);
+    if (isItemDisabled(targetItem)) return;
     if (selectedItems.includes(id)) {
       const newSel = selectedItems.filter(i => i !== id);
       setSelectedItems(newSel);
@@ -177,43 +220,34 @@ export default function MyItemsScreen({ navigation }) {
 
   const handleDeleteSelected = () => {
     if (selectedItems.length === 0) return;
-    Alert.alert(
-      t('myitems.delete_title') || "Hapus Barang",
-      (t('myitems.delete_confirm') || `Apakah Anda yakin ingin menghapus {count} barang terpilih?`).replace('{count}', selectedItems.length),
-      [
-        { text: t('postitem.cancel') || "Batal", style: "cancel" },
-        { 
-          text: t('myitems.btn_delete') || "Hapus", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await Promise.all(selectedItems.map(id => api.items.delete(id)));
-              showToast((t('myitems.delete_success') || `{count} barang berhasil dihapus`).replace('{count}', selectedItems.length), 'success');
-              setIsSelectionMode(false);
-              setSelectedItems([]);
-              loadMyItems();
-            } catch (err) {
-              console.log(err);
-              showToast(t('myitems.delete_fail') || "Gagal menghapus beberapa barang", "danger");
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    setDeleteAlertVisible(true);
+  };
+
+  const confirmDeleteSelected = async () => {
+    setDeleteAlertVisible(false);
+    try {
+      setLoading(true);
+      await Promise.all(selectedItems.map(id => api.items.delete(id)));
+      showToast((t('myitems.delete_success') || `{count} barang berhasil dihapus`).replace('{count}', selectedItems.length), 'success');
+      setIsSelectionMode(false);
+      setSelectedItems([]);
+      loadMyItems();
+    } catch (err) {
+      void 0;
+      showToast(t('myitems.delete_fail') || "Gagal menghapus beberapa barang", "danger");
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (isFocused) {
-      loadMyItems();
+      loadMyItems(false, false);
     }
   }, [isFocused]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadMyItems();
-  };
+  const handleRefresh = useCallback(() => {
+    loadMyItems(false, true);
+  }, [loadMyItems]);
 
   const handleOpenStatusModal = (item) => {
     setSelectedItem(item);
@@ -263,17 +297,20 @@ export default function MyItemsScreen({ navigation }) {
       return 0;
     });
 
+  const selectableItems = filteredItems.filter(i => i.status?.toLowerCase() === 'available');
+  const isAllSelected = selectableItems.length > 0 && selectedItems.length === selectableItems.length;
+
   const handleDelete = async (id) => {
     try {
       const res = await api.items.delete(id);
-      if (res && parseInt(res.status) === 200) {
+      if (res && (parseInt(res.status) === 200 || res.status === 200 || res.status === '200' || res.success)) {
         setItems(items.filter(item => (item.idItem || item.id) !== id));
         showToast(t('common.success') || 'Barang berhasil dihapus!', 'success');
       } else {
-        showToast(res.message || "Gagal menghapus barang", "danger");
+        showToast(res?.message || "Gagal menghapus barang", "danger");
       }
     } catch (error) {
-      console.log("Error deleting item:", error);
+      void 0;
       showToast("Gagal terhubung ke server", "danger");
     }
   };
@@ -351,7 +388,7 @@ export default function MyItemsScreen({ navigation }) {
                 <Ionicons 
                   name="options-outline" 
                   size={20} 
-                  color={(!activeStatuses.Available || !activeStatuses.Booked || !activeStatuses.Sold || sortBy !== 'Newest' || minPrice !== '' || maxPrice !== '') ? Colors.primary.yellow500 : theme.text.primary} 
+                  color={(!activeStatuses.Available || !activeStatuses.Booked || !activeStatuses.Sold || sortBy !== 'Newest' || minPrice !== '' || maxPrice !== '' || selectedCategory !== 'All') ? Colors.primary.yellow500 : theme.text.primary} 
                 />
               </TouchableOpacity>
             </View>
@@ -398,8 +435,8 @@ export default function MyItemsScreen({ navigation }) {
             <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
               <SegmentedControl
                 tabs={[
-                  { key: 'Sort', label: locale === 'id' ? 'Urutkan' : 'Sort' },
-                  { key: 'Filter', label: 'Filter' }
+                  { key: 'Sort', label: t('common.sort') },
+                  { key: 'Filter', label: t('common.filter') }
                 ]}
                 activeTab={activeFilterTab}
                 onChange={setActiveFilterTab}
@@ -414,12 +451,12 @@ export default function MyItemsScreen({ navigation }) {
                 <View style={{ marginBottom: 24 }}>
                   {/* --- SECTION 1: URUTKAN --- */}
                   <CustomText variant="h3" style={{ fontSize: 14, fontFamily: 'Barlow-Bold', color: theme.text.primary, paddingHorizontal: 20, marginBottom: 10 }}>
-                  {t('myitems.sort_time') || (locale === 'id' ? 'Urutkan Berdasarkan Waktu' : 'Sort by Time')}
+                  {t('myitems.sort_time')}
                 </CustomText>
                 <View style={{ paddingHorizontal: 20 }}>
                   {[
-                    { key: 'Newest', label: t('common.newest') || (locale === 'id' ? 'Terbaru' : 'Newest') },
-                    { key: 'Oldest', label: t('common.oldest') || (locale === 'id' ? 'Terlama' : 'Oldest') },
+                    { key: 'Newest', label: t('common.newest') },
+                    { key: 'Oldest', label: t('common.oldest') },
                   ].map((option) => {
                     const isActive = tempSortBy === option.key;
                     return (
@@ -448,7 +485,7 @@ export default function MyItemsScreen({ navigation }) {
               {/* --- SECTION 3: STATUS BARANG --- */}
               <View style={{ marginBottom: 24 }}>
                 <CustomText variant="h3" style={{ fontSize: 14, fontFamily: 'Barlow-Bold', color: theme.text.primary, paddingHorizontal: 20, marginBottom: 10 }}>
-                  {t('myitems.item_status') || (locale === 'id' ? 'Status Barang' : 'Item Status')}
+                  {t('myitems.item_status')}
                 </CustomText>
                 {['Available', 'Booked', 'Sold'].map((status) => (
                   <View key={status} style={{ paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -468,7 +505,7 @@ export default function MyItemsScreen({ navigation }) {
               {masterCategories.length > 0 && (
                 <View style={{ marginBottom: 24 }}>
                   <CustomText variant="h3" style={{ fontSize: 14, fontFamily: 'Barlow-Bold', color: theme.text.primary, paddingHorizontal: 20, marginBottom: 12 }}>
-                    {t('common.category') || (locale === 'id' ? 'Kategori' : 'Category')}
+                    {t('common.category')}
                   </CustomText>
                   <ScrollView 
                     horizontal 
@@ -488,7 +525,7 @@ export default function MyItemsScreen({ navigation }) {
                       }}
                     >
                       <CustomText style={{ color: tempSelectedCategory === 'All' ? Colors.light.surface : theme.text.primary, fontSize: 13, fontFamily: tempSelectedCategory === 'All' ? 'Barlow-Bold' : 'Barlow-Medium' }}>
-                        {t('common.all') || (locale === 'id' ? 'Semua' : 'All')}
+                        {t('common.all')}
                       </CustomText>
                     </TouchableOpacity>
                     {masterCategories.map((cat) => (
@@ -539,7 +576,7 @@ export default function MyItemsScreen({ navigation }) {
                   ...(isPriceError ? {} : Shadows.primary),
                 }}
               >
-                <CustomText type="body-bold" style={{ color: isPriceError ? theme.text.secondary : Colors.dark.background, fontSize: 14 }}>{locale === 'id' ? 'Terapkan Filter' : 'Apply Filter'}</CustomText>
+                <CustomText type="body-bold" style={{ color: isPriceError ? theme.text.secondary : Colors.dark.background, fontSize: 14 }}>{t('common.apply_filter')}</CustomText>
               </TouchableOpacity>
             </View>
 
@@ -553,6 +590,12 @@ export default function MyItemsScreen({ navigation }) {
       <ScrollView 
         contentContainerStyle={styles.listContainer} 
         showsVerticalScrollIndicator={false}
+        onScroll={({ nativeEvent }) => {
+          if (isCloseToBottom(nativeEvent)) {
+            loadMyItems(true, false);
+          }
+        }}
+        scrollEventThrottle={400}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -594,30 +637,31 @@ export default function MyItemsScreen({ navigation }) {
               <TouchableOpacity 
                 activeOpacity={0.7}
                 onPress={() => {
-                  if (selectedItems.length === filteredItems.length) {
+                  if (isAllSelected) {
                     setSelectedItems([]);
                   } else {
-                    setSelectedItems(filteredItems.map(i => i.idItem || i.id));
+                    setSelectedItems(selectableItems.map(i => i.idItem || i.id));
                   }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 }}
               >
                 <View style={{
                   width: 24, height: 24, borderRadius: 12, marginRight: 12,
-                  backgroundColor: selectedItems.length === filteredItems.length ? Colors.primary.blue500 : theme.surface,
-                  borderWidth: 2, borderColor: selectedItems.length === filteredItems.length ? Colors.primary.blue500 : theme.text.placeholder,
+                  backgroundColor: isAllSelected ? Colors.primary.blue500 : theme.surface,
+                  borderWidth: 2, borderColor: isAllSelected ? Colors.primary.blue500 : theme.text.placeholder,
                   alignItems: 'center', justifyContent: 'center'
                 }}>
-                  {selectedItems.length === filteredItems.length && <Ionicons name="checkmark" size={16} color={Colors.common.white} />}
+                  {isAllSelected && <Ionicons name="checkmark" size={16} color={Colors.common.white} />}
                 </View>
                 <CustomText type="h3" style={{ color: theme.text.primary, fontSize: 16 }}>
-                  {selectedItems.length === filteredItems.length ? (t('myitems.deselect_all') || 'Batal Semua') : (t('myitems.select_all') || 'Pilih Semua')}
+                  {isAllSelected ? (t('myitems.deselect_all') || 'Batal Semua') : (t('myitems.select_all') || 'Pilih Semua')}
                 </CustomText>
               </TouchableOpacity>
             )}
             {filteredItems.map((item) => {
               const itemId = item.idItem || item.id;
               const isSelected = selectedItems.includes(itemId);
+              const isLocked = item.status?.toLowerCase() === 'sold' || item.status?.toLowerCase() === 'booked';
               return (
               <TouchableOpacity
                 key={itemId}
@@ -636,6 +680,7 @@ export default function MyItemsScreen({ navigation }) {
                     backgroundColor: 'transparent',
                     borderColor: isSelected ? Colors.primary.blue500 : theme.border,
                     borderWidth: isSelected ? 2 : 1,
+                    opacity: (isSelectionMode && isLocked) ? 0.5 : 1,
                     transform: isSelected ? [{ scale: 0.98 }] : [{ scale: 1 }],
                     ...Shadows.primary,
                   }
@@ -645,11 +690,15 @@ export default function MyItemsScreen({ navigation }) {
                   <View style={{
                     position: 'absolute', top: 10, left: 10, zIndex: 20,
                     width: 24, height: 24, borderRadius: 12,
-                    backgroundColor: isSelected ? Colors.primary.blue500 : 'rgba(0,0,0,0.3)',
-                    borderWidth: 2, borderColor: isSelected ? Colors.primary.blue500 : 'rgba(255,255,255,0.7)',
+                    backgroundColor: isLocked ? (isDark ? 'rgba(50,50,50,0.8)' : 'rgba(220,220,220,0.8)') : (isSelected ? Colors.primary.blue500 : 'rgba(0,0,0,0.3)'),
+                    borderWidth: 2, borderColor: isLocked ? theme.border : (isSelected ? Colors.primary.blue500 : 'rgba(255,255,255,0.7)'),
                     alignItems: 'center', justifyContent: 'center'
                   }}>
-                    {isSelected && <Ionicons name="checkmark" size={16} color={Colors.common.white} />}
+                    {isLocked ? (
+                      <Ionicons name="lock-closed" size={12} color={theme.text.secondary} />
+                    ) : (
+                      isSelected && <Ionicons name="checkmark" size={16} color={Colors.common.white} />
+                    )}
                   </View>
                 )}
                 {isSelected && (
@@ -658,11 +707,23 @@ export default function MyItemsScreen({ navigation }) {
                     { backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)', zIndex: 15, borderRadius: 11 }
                   ]} pointerEvents="none" />
                 )}
-                <Image 
-                  source={{ uri: (item.imageUris && item.imageUris.length > 0) ? item.imageUris[0] : item.image }} 
-                  style={styles.listImage} 
-                  transition={200}
-                />
+                {(() => {
+                  const mainImg = item.imageUris && item.imageUris.length > 0 
+                    ? item.imageUris[0] 
+                    : (item.image ? item.image : null);
+                  
+                  return mainImg ? (
+                    <Image 
+                      source={{ uri: mainImg }} 
+                      style={styles.listImage} 
+                      transition={200}
+                    />
+                  ) : (
+                    <View style={[styles.listImage, { backgroundColor: isDark ? Colors.dark.surface : Colors.light.border, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Ionicons name="pricetag-outline" size={24} color={theme.text.secondary} />
+                    </View>
+                  );
+                })()}
                 <BlurView
                   intensity={isDark ? 40 : 80}
                   tint={isDark ? 'dark' : 'light'}
@@ -676,16 +737,13 @@ export default function MyItemsScreen({ navigation }) {
                       <CustomText variant="body-bold" numberOfLines={1} style={{ color: theme.text.primary, flex: 1, marginRight: 8, fontSize: 15 }}>
                         {item.title}
                       </CustomText>
-                      <TouchableOpacity 
-                        activeOpacity={0.7}
-                        onPress={() => handleOpenStatusModal(item)}
+                      <View 
                         style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '15', flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 3 }]}
                       >
                         <CustomText style={{ color: getStatusColor(item.status), fontSize: 10, fontFamily: 'Barlow-Bold' }}>
                           {getStatusText(item.status)}
                         </CustomText>
-                        <Ionicons name="chevron-down" size={8} color={getStatusColor(item.status)} />
-                      </TouchableOpacity>
+                      </View>
                     </View>
 
                     {/* Middle: Description & Category */}
@@ -716,67 +774,13 @@ export default function MyItemsScreen({ navigation }) {
             )})}
           </View>
         )}
+        {loadingMore && (
+          <ActivityIndicator size="small" color={Colors.primary.blue500} style={{ padding: 20 }} />
+        )}
+        <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* ==========================================
-         Status Update Modal
-      ========================================== */}
-      <Modal
-        visible={isStatusModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setStatusModalVisible(false)}
-      >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setStatusModalVisible(false)}>
-          <View style={[styles.dropdownMenu, { backgroundColor: theme.surface }]}>
-            <CustomText variant="h3" style={[styles.dropdownTitle, { color: theme.text.primary, paddingHorizontal: 20 }]}>
-              Ubah Status Barang
-            </CustomText>
-            {['Available', 'Booked', 'Sold'].map((statusOption) => {
-              const isActive = selectedItem?.status === statusOption;
-              return (
-                <TouchableOpacity
-                  key={statusOption}
-                  style={[styles.dropdownOption, isActive && { backgroundColor: theme.background }]}
-                  onPress={async () => {
-                    if (selectedItem) {
-                      try {
-                        const res = await api.items.updateStatus(selectedItem.idItem || selectedItem.id, statusOption);
-                        if (res && parseInt(res.status) === 200) {
-                          setItems(items.map(it => {
-                            if ((it.idItem || it.id) === (selectedItem.idItem || selectedItem.id)) {
-                              return { ...it, status: statusOption };
-                            }
-                            return it;
-                          }));
-                          showToast('Status barang berhasil diperbarui', 'success');
-                        } else {
-                          showToast(res.message || 'Gagal merubah status', 'danger');
-                        }
-                      } catch (error) {
-                        console.log("Error updating status:", error);
-                        showToast("Gagal terhubung ke server", "danger");
-                      }
-                    }
-                    setStatusModalVisible(false);
-                  }}
-                >
-                  <CustomText
-                    variant="body"
-                    style={{
-                      color: isActive ? Colors.primary.yellow500 : theme.text.primary,
-                      fontFamily: isActive ? 'Barlow-Bold' : 'Barlow-Medium'
-                    }}
-                  >
-                    {getStatusText(statusOption)}
-                  </CustomText>
-                  {isActive && <Ionicons name="checkmark" size={20} color={Colors.primary.yellow500} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+
 
       {/* ==========================================
          Bottom Selection Bar
@@ -822,6 +826,20 @@ export default function MyItemsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* --- CUSTOM ALERT (DELETE ITEMS) --- */}
+      <CustomAlert
+        visible={deleteAlertVisible}
+        type="danger"
+        title={t('myitems.delete_title') || "Hapus Barang"}
+        message={(t('myitems.delete_confirm') || `Apakah Anda yakin ingin menghapus {count} barang terpilih?`).replace('{count}', selectedItems.length)}
+        showCancel
+        confirmText={t('myitems.btn_delete') || "Hapus"}
+        cancelText={t('postitem.cancel') || "Batal"}
+        onConfirm={confirmDeleteSelected}
+        onCancel={() => setDeleteAlertVisible(false)}
+        onClose={() => setDeleteAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -869,11 +887,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyState: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    marginTop: 40,
   },
   emptyIconWrapper: {
     width: 120,
@@ -933,14 +950,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   listContainer: {
+    flexGrow: 1,
     padding: 16,
     paddingBottom: 80,
   },
-  emptyState: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   listWrapper: {
     flex: 1,
     gap: 12,

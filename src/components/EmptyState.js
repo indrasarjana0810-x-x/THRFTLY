@@ -1,9 +1,9 @@
 /* ==========================================
-   Empty State
+   Komponen Layar Empty State
 ========================================== */
 import React from 'react';
 import { View, StyleSheet, useColorScheme } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
 import CustomText from './CustomText';
 import CustomButton from './CustomButton';
@@ -11,7 +11,7 @@ import CustomButton from './CustomButton';
 export default function EmptyState({
   title,
   description,
-  icon = 'shopping-cart',
+  icon = 'cube',
   buttonTitle,
   onButtonPress,
   style,
@@ -20,20 +20,25 @@ export default function EmptyState({
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
 
-  const validIcon = icon === 'cart' ? 'shopping-cart' : icon === 'package' ? 'inventory-2' : icon;
+  // Map icon names to Ionicons equivalents
+  let validIcon = 'cube-outline';
+  if (icon === 'cart' || icon === 'shopping-cart') validIcon = 'cart-outline';
+  if (icon === 'receipt' || icon === 'list') validIcon = 'receipt-outline';
+  if (icon === 'notifications' || icon === 'bell') validIcon = 'notifications-outline';
+  if (icon === 'search') validIcon = 'search-outline';
 
   return (
     <View style={[styles.container, style]}>
-      <View style={[styles.iconCircle, { backgroundColor: theme.border }]}>
-        <MaterialIcons name={validIcon} size={32} color={Colors.primary.blue500} />
+      <View style={[styles.iconCircle, { backgroundColor: Colors.primary.blue500 + '15' }]}>
+        <Ionicons name={validIcon} size={64} color={Colors.primary.blue500} />
       </View>
       
-      <CustomText type="h2" style={styles.title}>
+      <CustomText type="h2" style={[styles.title, { color: theme.text.primary }]}>
         {title}
       </CustomText>
       
       {description && (
-        <CustomText type="caption" style={styles.description}>
+        <CustomText type="body" style={[styles.description, { color: theme.text.secondary }]}>
           {description}
         </CustomText>
       )}
@@ -51,33 +56,32 @@ export default function EmptyState({
   );
 }
 
-/* Styles */
+/* ---------- Gaya ---------- */
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     paddingVertical: 40,
   },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   title: {
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   description: {
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 18,
-    paddingHorizontal: 12,
+    marginBottom: 24,
+    paddingHorizontal: 20,
   },
   button: {
     minWidth: 140,

@@ -35,6 +35,29 @@ import { fetchCart } from './src/store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LanguageProvider } from './src/localization/LanguageContext';
 import api from './src/services/api';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { Platform, LogBox } from 'react-native';
+
+// --- HIDE EXPO GO NOTIFICATION ERRORS ---
+LogBox.ignoreLogs(['removed from Expo Go', 'expo-notifications']);
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('removed from Expo Go')) {
+    return;
+  }
+  originalConsoleError(...args);
+};
+// ----------------------------------------
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const Stack = createNativeStackNavigator();
 
@@ -47,6 +70,114 @@ function AppContent() {
   const isLoggedIn = useSelector(selectIsAuthenticated);
   const dispatch = useDispatch();
   const [showSplash, setShowSplash] = useState(true);
+
+  /* ---------- Push Notifications & Channel Setup ---------- */
+  useEffect(() => {
+    async function setupNotificationChannel() {
+      if (Platform.OS === 'android') {
+        try {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'General Notifications',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#2563EB',
+            sound: 'default',
+          });
+        } catch (e) {}
+      }
+    }
+    setupNotificationChannel();
+
+    async function registerForPushNotificationsAsync() {
+      if (Constants.appOwnership === 'expo') {
+        return null;
+      }
+
+      let token;
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
+  
+      if (Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        
+        // Kita HAPUS requestPermissionsAsync dari sini.
+        // Biar pop-up izin notifikasi (OS default) NGGAK muncul otomatis di background.
+        // Izin HANYA akan diminta lewat Custom Modal di NotificationScreen.js.
+
+        if (finalStatus !== 'granted') {
+          void 0;
+          return;
+        }
+        try {
+          const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+          if (!projectId) {
+            return;
+          }
+
+          token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+          void 0;
+        } catch (e) {
+          // Ignore silently to avoid console spam
+        }
+      } else {
+        void 0;
+      }
+      return token;
+    }
+
+    if (isLoggedIn) {
+      // Tunda 5 detik agar tidak bentrok dengan modal perizinan lokasi di layar awal
+      const timer = setTimeout(() => {
+        registerForPushNotificationsAsync().then(token => {
+          if (token) {
+            api.users.saveToken(token).catch(e => void 0);
+          }
+        });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoggedIn]);
+
+  /* ---------- Notification Polling for Realtime Local Pop-ups ---------- */
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    let lastKnownNotifCount = null;
+
+    const checkNewNotifications = async () => {
+      try {
+        const res = await api.notifications.get();
+        if (res && parseInt(res.status) === 200 && res.data && res.data.notifications) {
+          const list = res.data.notifications;
+          if (list.length > 0) {
+            const latest = list[0];
+            if (lastKnownNotifCount !== null && list.length > lastKnownNotifCount && !latest.isRead) {
+              const notifSetting = await AsyncStorage.getItem('notifGlobal');
+              if (notifSetting !== 'false') {
+                const { triggerLocalNotification } = require('./src/utils/notificationHelper');
+                triggerLocalNotification(latest.title, latest.message, { refId: latest.refId });
+              }
+            }
+            lastKnownNotifCount = list.length;
+          }
+        }
+      } catch (e) {
+        // Silently ignore network errors during background check
+      }
+    };
+
+    checkNewNotifications();
+    const interval = setInterval(checkNewNotifications, 5000);
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   /* ---------- Initialization (Cart & Auto Login) ---------- */
   useEffect(() => {
@@ -86,7 +217,7 @@ function AppContent() {
               dispatch(setCredentials({ token, user: userProfile }));
             }
           } catch (apiError) {
-            console.log("Error memverifikasi profil saat init:", apiError);
+            void 0;
             if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
               await AsyncStorage.removeItem('userToken');
               await AsyncStorage.removeItem('userProfile');
@@ -99,7 +230,7 @@ function AppContent() {
         dispatch(fetchCart());
         
       } catch (e) {
-        console.log("Gagal inisialisasi aplikasi:", e);
+        void 0;
       }
     };
     initializeApp();
@@ -162,32 +293,9 @@ function AppContent() {
               </>
             ) : (
               <>
-                <Stack.Screen name="Login">
-                  {(props) => (
-                    <LoginScreen
-                      {...props}
-                      onNavigateToRegister={() => props.navigation.navigate('Register')}
-                      onNavigateToForgotPassword={() => props.navigation.navigate('ForgotPassword')}
-                    />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="Register">
-                  {(props) => (
-                    <RegisterScreen
-                      {...props}
-                      onNavigateToLogin={() => props.navigation.goBack()}
-                      onRegisterSuccess={() => props.navigation.navigate('Login')}
-                    />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="ForgotPassword">
-                  {(props) => (
-                    <ForgotPasswordScreen
-                      {...props}
-                      onNavigateToLogin={() => props.navigation.navigate('Login')}
-                    />
-                  )}
-                </Stack.Screen>
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+                <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
               </>
             )}
           </Stack.Navigator>

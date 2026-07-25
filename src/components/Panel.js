@@ -1,5 +1,5 @@
 /* ==========================================
-   Panel
+   Komponen Layar Panel
 ========================================== */
 import React from 'react';
 import { View, StyleSheet, useColorScheme } from 'react-native';
@@ -24,7 +24,7 @@ export default function Panel({
   );
 }
 
-/* Styles */
+/* ---------- Gaya ---------- */
 
 const getStyles = (theme, isDark, shadow) => {
   const shadowColor = Colors.primary.blue500;

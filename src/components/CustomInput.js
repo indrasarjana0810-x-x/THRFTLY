@@ -1,5 +1,5 @@
 /* ==========================================
-   Custom Input
+   Komponen Layar Custom Input
 ========================================== */
 import React, {
   useState,
@@ -167,7 +167,7 @@ const CustomInput = forwardRef(
 
 export default CustomInput;
 
-/* Static Styles */
+/* ---------- Gaya Statis ---------- */
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,

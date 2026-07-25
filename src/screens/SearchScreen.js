@@ -1,5 +1,5 @@
 /* ==========================================
-   Search Screen
+   Komponen Layar Search
 ========================================== */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -19,6 +19,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/colors';
 import ProductCard from '../components/ProductCard';
@@ -31,8 +32,15 @@ import api from '../services/api';
 import { useLanguage } from '../localization/LanguageContext';
 import { useSelector } from 'react-redux';
 import { selectAuthUser } from '../store/slices/authSlice';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
+
+
+const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }) => {
+  const paddingToBottom = 50;
+  return layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+};
 
 export default function SearchScreen({ navigation, route }) {
   const { t } = useLanguage();
@@ -58,6 +66,16 @@ export default function SearchScreen({ navigation, route }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      let location = await Location.getCurrentPositionAsync({});
+      setUserLocation(location.coords);
+    })();
+  }, []);
   
   // Pagination
   const [page, setPage] = useState(0);
@@ -119,7 +137,7 @@ export default function SearchScreen({ navigation, route }) {
           ]);
         }
       } catch (err) {
-        console.log("Error fetching categories:", err);
+        void 0;
       }
     };
     fetchCategories();
@@ -155,6 +173,11 @@ export default function SearchScreen({ navigation, route }) {
       if (maxPrice !== '') params.maxPrice = parseInt(maxPrice);
       if (selectedCondition !== 'Semua') params.condition = selectedCondition;
 
+      if (userLocation) {
+        params.userLat = userLocation.latitude;
+        params.userLng = userLocation.longitude;
+      }
+
       const res = await api.items.getAll(params);
       if (res && parseInt(res.status) === 200 && res.data) {
         if (isLoadMore) {
@@ -166,13 +189,13 @@ export default function SearchScreen({ navigation, route }) {
         setTotalPages(res.data.totalPages || 1);
       }
     } catch (error) {
-      console.log("Error loading search items:", error);
+      void 0;
     } finally {
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [loadingMore, page, totalPages, selectedCategory, searchQuery, minPrice, maxPrice, selectedCondition]);
+  }, [loadingMore, page, totalPages, selectedCategory, searchQuery, minPrice, maxPrice, selectedCondition, userLocation]);
 
   const onRefresh = useCallback(() => {
     loadItems(false, true);
@@ -188,6 +211,13 @@ export default function SearchScreen({ navigation, route }) {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, selectedCategory, minPrice, maxPrice, selectedCondition]);
+
+  // Auto refresh search results when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadItems(false);
+    }, [selectedCategory, searchQuery, minPrice, maxPrice, selectedCondition])
+  );
 
   const handleSearch = () => {
     Keyboard.dismiss();
@@ -303,49 +333,70 @@ export default function SearchScreen({ navigation, route }) {
 
       {/* Main Content */}
       {renderHeader()}
-      <FlatList
-        data={items.filter(item => !user || (item.sellerId !== user.idUser && item.sellerId !== user.nim))}
-        keyExtractor={(item) => item.idItem || item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <View style={styles.cardWrapper}>
-            <ProductCard
-              item={item}
-              onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
-              layout="masonry"
-            />
-          </View>
-        )}
-        ListEmptyComponent={
-          loading ? (
-            <ActivityIndicator size="large" color={Colors.primary.blue500} style={{ marginTop: 40 }} />
-          ) : (
-            <EmptyState
-              title={t('search.empty_title') || 'Barang tidak ditemukan'}
-              description={t('search.empty_desc') || 'Coba gunakan kata kunci lain atau pilih kategori yang berbeda.'}
-              icon="search"
-              style={{ marginTop: 40 }}
-            />
-          )
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[Colors.primary.blue500]}
-            tintColor={Colors.primary.blue500}
-          />
-        }
-        onEndReached={() => loadItems(true)}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loadingMore ? (
-            <ActivityIndicator size="small" color={Colors.primary.blue500} style={{ padding: 20 }} />
-          ) : <View style={{ height: 100 }} /> // Spacer for bottom nav
-        }
-      />
+      {(() => {
+        const filteredItems = items.filter(item => !user || (item.sellerId !== user.idUser && item.sellerId !== user.nim));
+        return (
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            onScroll={({ nativeEvent }) => {
+              if (isCloseToBottom(nativeEvent)) {
+                loadItems(true);
+              }
+            }}
+            scrollEventThrottle={400}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.primary.blue500]}
+                tintColor={Colors.primary.blue500}
+              />
+            }
+          >
+            {loading && items.length === 0 ? (
+              <ActivityIndicator size="large" color={Colors.primary.blue500} style={{ marginTop: 40 }} />
+            ) : filteredItems.length === 0 ? (
+              <EmptyState
+                title={t('search.empty_title') || 'Barang tidak ditemukan'}
+                description={t('search.empty_desc') || 'Coba gunakan kata kunci lain atau pilih kategori yang berbeda.'}
+                icon="search"
+              />
+            ) : (
+              <View style={styles.masonryContainer}>
+                <View style={styles.masonryColumn}>
+                  {filteredItems.filter((_, i) => i % 2 === 0).map((item) => (
+                    <ProductCard
+                      key={item.idItem || item.id}
+                      item={item}
+                      onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
+                      layout="masonry"
+                      userLocation={userLocation}
+                      style={{ marginBottom: 16 }}
+                    />
+                  ))}
+                </View>
+                <View style={styles.masonryColumn}>
+                  {filteredItems.filter((_, i) => i % 2 !== 0).map((item) => (
+                    <ProductCard
+                      key={item.idItem || item.id}
+                      item={item}
+                      onPress={() => navigation.navigate('Detail', { id: item.idItem || item.id })}
+                      layout="masonry"
+                      userLocation={userLocation}
+                      style={{ marginBottom: 16 }}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+            {loadingMore && (
+              <ActivityIndicator size="small" color={Colors.primary.blue500} style={{ padding: 20 }} />
+            )}
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        );
+      })()}
 
       {/* Filter Modal */}
       <Modal
@@ -544,6 +595,12 @@ export default function SearchScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  masonryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 16,
+  },
   safeArea: {
     flex: 1,
   },
@@ -606,6 +663,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   listContent: {
+    flexGrow: 1,
     paddingTop: 16,
     paddingBottom: 20,
   },

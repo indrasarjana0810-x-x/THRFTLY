@@ -1,7 +1,7 @@
 /* ==========================================
-   Custom Toggle Component
+   Komponen Layar Komponen Custom Toggle
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useEffect, useRef } from 'react';
 import {
   TouchableOpacity,
@@ -64,7 +64,7 @@ export default function CustomToggle({ value, onValueChange, activeColor = Color
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const styles = StyleSheet.create({
   toggleContainer: {
     width: 44,

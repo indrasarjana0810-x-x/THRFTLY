@@ -1,5 +1,5 @@
 /* ==========================================
-   Post Item Screen
+   Komponen Layar Post Item
 ========================================== */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
@@ -262,6 +262,11 @@ export default function PostItemScreen({ navigation, route }) {
 
   // Prefill form in edit mode
   useEffect(() => {
+    const isLocked = editItem?.status?.toLowerCase() === 'sold' || editItem?.status?.toLowerCase() === 'booked';
+    if (editMode && editItem && isLocked) {
+      navigation.goBack();
+      return;
+    }
     const fetchFullItem = async () => {
       try {
         const itemId = editItem.id || editItem.idItem;
@@ -300,7 +305,7 @@ export default function PostItemScreen({ navigation, route }) {
           }
         }
       } catch (error) {
-        console.log("Error fetching full item for edit:", error);
+        void 0;
       }
     };
 
@@ -346,7 +351,7 @@ export default function PostItemScreen({ navigation, route }) {
           setChecklistTemplate(null);
         }
       } catch (error) {
-        console.log("Error fetching checksheet templates:", error);
+        void 0;
         setChecklistTemplate(null);
       }
     };
@@ -390,7 +395,7 @@ export default function PostItemScreen({ navigation, route }) {
           setCategories(mapped);
         }
       } catch (error) {
-        console.log("Error fetching categories:", error);
+        void 0;
       }
     };
     fetchCategories();
@@ -413,11 +418,11 @@ export default function PostItemScreen({ navigation, route }) {
     }));
     spots.push({
       id: 'gps',
-      label: locale === 'id' ? 'Gunakan Lokasi GPS HP Saat Ini' : 'Use Current Device GPS Location',
+      label: t('postitem.use_gps') || (locale === 'id' ? 'Gunakan Lokasi GPS HP Saat Ini' : 'Use Current Device GPS Location'),
       isGps: true
     });
     return spots;
-  }, [locale]);
+  }, [locale, t]);
 
   const handleSelectSpot = (spot) => {
     setSpotModalVisible(false);
@@ -430,7 +435,6 @@ export default function PostItemScreen({ navigation, route }) {
       if (!location) {
         setLocation(spot.label);
       }
-      showToast(`${t('postitem.spot_set_toast') || 'Spot COD ditetapkan:'} ${spot.label}`, 'success');
     }
   };
 
@@ -478,7 +482,7 @@ export default function PostItemScreen({ navigation, route }) {
         setImageUris(prev => [...prev, fileUri]);
       }
     } catch (error) {
-      console.log('Error picking image:', error);
+      void 0;
       showToast('Gagal memproses gambar.', 'danger');
     }
   };
@@ -577,7 +581,7 @@ export default function PostItemScreen({ navigation, route }) {
         }
       }
     } catch (error) {
-      console.log("Error posting item:", error);
+      void 0;
       showToast("Gagal mengunggah foto atau menyimpan data", "danger");
     } finally {
       setLoading(false);
@@ -709,7 +713,7 @@ export default function PostItemScreen({ navigation, route }) {
             <CustomInput
               label={t('postitem.price_label') || "Harga Barang"}
               placeholder=""
-              value={price ? price.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+              value={price ? price.replace(/\B(?=(\d{3})+(?!\d))/g, locale === 'en' ? ',' : '.') : ''}
               onChangeText={(text) => {
                 // Strip semua non-angka dan titik separator, lalu simpan nilai numerik murni
                 const numericValue = text.replace(/[^0-9]/g, '');
@@ -721,6 +725,7 @@ export default function PostItemScreen({ navigation, route }) {
               inputStyle={{ textAlign: 'right', height: 48, paddingHorizontal: 14 }}
               wrapperStyle={{
                 paddingLeft: 0,
+                paddingRight: 0,
                 paddingVertical: 0,
                 height: 48,
                 overflow: 'hidden',
@@ -735,8 +740,45 @@ export default function PostItemScreen({ navigation, route }) {
                   borderBottomLeftRadius: 10,
                 }}>
                   <CustomText type="body-bold" style={{ color: Colors.light.surface, marginTop: Platform.OS === 'ios' ? 2 : 0 }}>
-                    Rp
+                    {locale === 'en' ? 'IDR' : 'Rp'}
                   </CustomText>
+                </View>
+              }
+              rightComponent={
+                <View style={{
+                  flexDirection: 'column',
+                  width: 32,
+                  height: 48,
+                  justifyContent: 'center',
+                }}>
+                  <TouchableOpacity 
+                    activeOpacity={0.5}
+                    style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 2 }}
+                    onPress={() => {
+                      const current = parseInt(price) || 0;
+                      if (current === 0) {
+                        setPrice('10000');
+                      } else {
+                        setPrice((current + 1000).toString());
+                      }
+                    }}
+                  >
+                    <Ionicons name="chevron-up" size={16} color={theme.text.secondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    activeOpacity={0.5}
+                    style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 }}
+                    onPress={() => {
+                      const current = parseInt(price) || 0;
+                      if (current <= 1000) {
+                        setPrice('');
+                      } else {
+                        setPrice((current - 1000).toString());
+                      }
+                    }}
+                  >
+                    <Ionicons name="chevron-down" size={16} color={theme.text.secondary} />
+                  </TouchableOpacity>
                 </View>
               }
             />

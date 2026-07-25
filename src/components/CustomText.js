@@ -1,5 +1,5 @@
 /* ==========================================
-   Custom Text
+   Komponen Layar Custom Text
 ========================================== */
 import React from 'react';
 import { Text, StyleSheet, useColorScheme } from 'react-native';
@@ -45,7 +45,7 @@ export default function CustomText({
   );
 }
 
-/* Styles */
+/* ---------- Gaya ---------- */
 
 const getStyles = (theme) => {
   return StyleSheet.create({

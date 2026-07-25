@@ -9,18 +9,27 @@ import { NativeModules } from 'react-native';
  * Mengambil IP address host secara dinamis dari Metro Bundler untuk mempermudah testing di fisik/emulator.
  * Mengembalikan fallback statis jika tidak terdeteksi.
  */
+// ⚠️ Masukkan URL Cloudflare / Ngrok Tunnel di sini untuk testing beda jaringan (4G/5G/Wi-Fi lain)
+// Kosongkan string '' jika ingin menggunakan IP lokal otomatis kembali.
+const TUNNEL_URL = '';
+
 const getBaseUrl = () => {
+  if (TUNNEL_URL && TUNNEL_URL.trim() !== '') {
+    void 0;
+    return TUNNEL_URL;
+  }
+
   try {
     // 1. Coba metode Expo Constants (Paling ampuh di Expo Go)
-    const debuggerHost = 
-      Constants.expoConfig?.hostUri || 
-      Constants.manifest?.debuggerHost || 
+    const debuggerHost =
+      Constants.expoConfig?.hostUri ||
+      Constants.manifest?.debuggerHost ||
       Constants.manifest2?.extra?.expoGo?.debuggerHost;
-    
+
     if (debuggerHost) {
       const ipAddress = debuggerHost.split(':')[0];
       const url = `http://${ipAddress}:8080/api`;
-      console.log("🔥 [Config] (Expo) Dynamic API URL:", url);
+      void 0;
       return url;
     }
 
@@ -31,16 +40,16 @@ const getBaseUrl = () => {
       if (match && match[1]) {
         const ipAddress = match[1];
         const url = `http://${ipAddress}:8080/api`;
-        console.log("🔥 [Config] (Native) Dynamic API URL:", url);
+        void 0;
         return url;
       }
     }
   } catch (error) {
-    console.log("Gagal dapet IP otomatis:", error);
+    void 0;
   }
-  
-  console.log("⚠️ [Config] Using fallback API URL");
-  return "http://10.1.2.50:8080/api";
+
+  void 0;
+  return "http://10.146.92.207:8080/api";
 };
 
 const Config = {

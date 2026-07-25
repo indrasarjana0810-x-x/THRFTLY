@@ -1,7 +1,7 @@
 /* ==========================================
-   Avatar Component
+   Komponen Layar Komponen Avatar
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
@@ -33,7 +33,7 @@ const Avatar = React.memo(function Avatar({ imageUrl, name = "?", size = 48 }) {
 
 export default Avatar;
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.primary.blue500,

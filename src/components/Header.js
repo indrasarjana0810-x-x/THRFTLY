@@ -1,7 +1,7 @@
 /* ==========================================
-   Header Component
+   Komponen Layar Komponen Header
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, useColorScheme, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,7 +47,7 @@ export default function Header({ title, showBack = true, rightComponent, noBorde
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const styles = StyleSheet.create({
   container: {
     height: 56,

@@ -1,7 +1,7 @@
 /* ==========================================
-   Login Screen Component
+   Komponen Layar Masuk
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -37,8 +37,8 @@ import { setCredentials } from "../../store/slices/authSlice";
  * Halaman autentikasi utama aplikasi.
  * Menangani login mahasiswa menggunakan NIM dan Kata Sandi.
  */
-export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPassword }) {
-  /* ---------- Component States & Refs ---------- */
+export default function LoginScreen({ navigation }) {
+  /* ---------- State & Ref Komponen ---------- */
   const { showToast } = useToast();
   const { t } = useLanguage();
   const dispatch = useDispatch();
@@ -51,7 +51,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
 
   const shiftAnim = useRef(new Animated.Value(0)).current;
 
-  /* ---------- Lifecycle & Animations ---------- */
+  /* ---------- Siklus Hidup & Animasi ---------- */
   useEffect(() => {
     // Menggeser panel saat keyboard muncul
     const showSubscription = Keyboard.addListener(
@@ -90,7 +90,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
 
   const styles = getStyles(theme, isDark);
 
-  /* ---------- Authentication Logic ---------- */
+  /* ---------- Logika Autentikasi ---------- */
   const handleLogin = async () => {
     // Validasi Form
     setErrors({});
@@ -120,8 +120,8 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
         // Coba narik data profil dari backend (karena tokennya udah bisa dipake lewat interceptor)
         let userProfile = null;
         try {
-          // Temporarily set token in API headers just for this request since interceptor
-          // might not immediately have the token if AsyncStorage takes a split second
+          // Pasang token sementara di header API khusus untuk request ini karena interceptor
+          // mungkin belum ke-update secara instan kalo AsyncStorage butuh sepersekian detik
           const profileResponse = await api.users.getProfile();
           if (parseInt(profileResponse.status) === 200 && profileResponse.data) {
             const profileData = profileResponse.data;
@@ -138,7 +138,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
             };
           }
         } catch (profileErr) {
-          console.log("Failed to fetch profile after login", profileErr);
+          void 0;
         }
 
         if (userProfile) {
@@ -151,7 +151,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
         showToast(translatedMsg, "danger");
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = t('auth.server_error') || "Gagal terhubung ke server Spring Boot Anda.";
       if (err.response && err.response.data) {
         let rawCode = err.response.data.message || err.response.data.error;
@@ -163,7 +163,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
     }
   };
 
-  /* ---------- Render ---------- */
+  /* ---------- Tampilan ---------- */
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
@@ -253,7 +253,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
               <TouchableOpacity
                 style={styles.forgotBtn}
                 activeOpacity={0.7}
-                onPress={onNavigateToForgotPassword}
+                onPress={() => navigation.navigate('ForgotPassword')}
               >
                 <Text style={styles.forgotText}>{t('auth.forgot_password') || "Lupa Kata Sandi?"}</Text>
               </TouchableOpacity>
@@ -274,7 +274,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
 
               <View style={styles.registerWrapper}>
                 <Text style={styles.registerLabel}>{t('auth.no_account') || "Belum punya akun?"}</Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToRegister}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Register')}>
                   <Text style={styles.registerLink}>{t('auth.register_now') || "Daftar Sekarang"}</Text>
                 </TouchableOpacity>
               </View>
@@ -286,7 +286,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToForgotPa
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const getStyles = (theme, isDark) => {
   return StyleSheet.create({
     safeArea: {

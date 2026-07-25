@@ -18,6 +18,9 @@ import {
   Share,
   FlatList,
   Animated,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
@@ -27,6 +30,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { selectAuthUser } from '../store/slices/authSlice';
 import { selectCartItems, toggleCartOptimistic, toggleCartApi } from '../store/slices/cartSlice';
 import Colors from '../constants/colors';
+import { Shadows } from '../constants/styles';
 import CustomText from '../components/CustomText';
 import CustomAlert from '../components/CustomAlert';
 import Avatar from '../components/Avatar';
@@ -113,18 +117,29 @@ export default function DetailScreen({ route, navigation }) {
 
   /* ---------- Scroll Animations ---------- */
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollRange, setScrollRange] = useState(100);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+  const [scrollLayoutHeight, setScrollLayoutHeight] = useState(0);
+
+  useEffect(() => {
+    if (scrollContentHeight > 0 && scrollLayoutHeight > 0) {
+      const maxScroll = Math.max(0, scrollContentHeight - scrollLayoutHeight);
+      setScrollRange(Math.max(1, Math.min(100, maxScroll)));
+    }
+  }, [scrollContentHeight, scrollLayoutHeight]);
+
   const headerBgOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
+    inputRange: [0, scrollRange],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
   const iconOpacityTop = scrollY.interpolate({
-    inputRange: [0, 80],
+    inputRange: [0, scrollRange * 0.8],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
   const iconOpacitySolid = scrollY.interpolate({
-    inputRange: [0, 80],
+    inputRange: [0, scrollRange * 0.8],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
@@ -132,6 +147,9 @@ export default function DetailScreen({ route, navigation }) {
   /* ---------- Data State ---------- */
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isWaModalVisible, setIsWaModalVisible] = useState(false);
+  const [waMeetingNote, setWaMeetingNote] = useState('');
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isDeleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
@@ -175,9 +193,7 @@ export default function DetailScreen({ route, navigation }) {
   const handleToggleFavorite = () => {
     if (!user) {
       showToast(
-        locale === 'id' 
-          ? 'Anda harus login untuk menyimpan barang ke keranjang belanja' 
-          : 'You must log in to save items to your shopping cart',
+        t('detail.login_to_save'),
         'warning'
       );
       return;
@@ -207,7 +223,18 @@ export default function DetailScreen({ route, navigation }) {
   };
 
   /* ---------- Derived State ---------- */
-  const isOwner = user && item && (user.idUser === item.sellerId || user.nim === item.sellerId);
+  const isOwner = Boolean(
+    user && item && (
+      user.idUser === item.sellerId ||
+      user.idUser === item.userId ||
+      user.idUser === item.idUser ||
+      user.nim === item.sellerId ||
+      user.email === item.sellerEmail ||
+      user.email === item.email ||
+      user.name === item.sellerName ||
+      user.name === item.userName
+    )
+  );
   const imagesList = item?.imageUris?.length > 0 ? item.imageUris : [];
   const imageBg = isDark ? Colors.dark.surface : Colors.light.border;
   const cardBg = isDark ? Colors.dark.background : Colors.common.white;
@@ -321,11 +348,82 @@ export default function DetailScreen({ route, navigation }) {
   };
 
   const handleContactSeller = () => {
-    if (!item.sellerPhone) { showToast('Nomor WA penjual tidak tersedia.', 'warning'); return; }
-    let phone = item.sellerPhone.replace(/[^0-9]/g, '');
-    if (phone.startsWith('0')) phone = '62' + phone.slice(1);
-    const msg = `Halo ${item.sellerName || 'Penjual'}, saya tertarik dengan barang "${item.title}" di Thriftly. Masih tersedia?`;
-    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`).catch(() => showToast('Gagal membuka WhatsApp.', 'danger'));
+    if (!user) {
+      showToast(
+        t('detail.login_required_contact'), 
+        'warning'
+      );
+      return;
+    }
+    if (!item?.sellerPhone) { 
+      showToast(
+        t('detail.no_wa') || 'Nomor WA penjual tidak tersedia.', 
+        'warning'
+      ); 
+      return; 
+    }
+
+    const currentStatus = item?.status || '';
+    if (currentStatus.toLowerCase() !== 'available' && currentStatus.toLowerCase() !== 'tersedia') {
+      showToast(
+        t('detail.not_available') || 'Barang ini sudah tidak tersedia untuk dipesan.', 
+        'warning'
+      );
+      return;
+    }
+
+    // Initialize empty meeting note (not prefilled with location)
+    setWaMeetingNote('');
+    setIsWaModalVisible(true);
+  };
+
+  const confirmCheckoutAndWA = async () => {
+    setIsWaModalVisible(false);
+    setIsCheckingOut(true);
+    try {
+      const itemId = item.idItem || item.id;
+      const finalNote = waMeetingNote.trim();
+      const res = await api.transaction.checkout([itemId], finalNote);
+
+      if (res && (parseInt(res.status) === 200 || parseInt(res.status) === 201)) {
+        showToast(
+          t('cart.success_toast') || 'Pemesanan COD berhasil dibuat!',
+          'success'
+        );
+
+        // Update local item status to Booked
+        setItem(prev => prev ? { ...prev, status: 'Booked' } : prev);
+
+        let phone = item.sellerPhone.replace(/[^0-9]/g, '');
+        if (phone.startsWith('0')) phone = '62' + phone.slice(1);
+
+        let msg = '';
+        if (locale === 'id') {
+          msg = `Halo ${item.sellerName || 'Penjual'},\nSaya tertarik untuk membeli produk berikut di Thriftly:\n\n1. *${item.title}* (${formatCurrency(item.price)})\n\n*Total:* ${formatCurrency(item.price)}`;
+          if (finalNote) {
+            msg += `\n*Catatan COD:* ${finalNote}`;
+          }
+          msg += `\n\nSaya telah membuat pesanan COD di aplikasi Thriftly. Apakah kita bisa janjian waktu & lokasi ketemuan? Terima kasih.`;
+        } else {
+          msg = `Hello ${item.sellerName || 'Seller'},\nI am interested in purchasing the following product on Thriftly:\n\n1. *${item.title}* (${formatCurrency(item.price)})\n\n*Total:* ${formatCurrency(item.price)}`;
+          if (finalNote) {
+            msg += `\n*COD Note:* ${finalNote}`;
+          }
+          msg += `\n\nI have placed a COD order on the Thriftly app. Can we schedule a meeting time & location? Thank you.`;
+        }
+
+        Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`).catch(() => {
+          showToast(t('detail.open_wa_err'), 'danger');
+        });
+      } else {
+        showToast(res?.message || t('common.error'), 'danger');
+      }
+    } catch (err) {
+      void 0;
+      showToast(t('auth.server_error'), 'danger');
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   const handleAddToCart = () => {
@@ -351,7 +449,7 @@ export default function DetailScreen({ route, navigation }) {
         message: shareMessage,
       });
     } catch (error) {
-      console.log('Error sharing item:', error);
+      void 0;
     }
   };
 
@@ -359,16 +457,17 @@ export default function DetailScreen({ route, navigation }) {
     setDeleteAlertVisible(false);
     setLoading(true);
     try {
-      const res = await api.items.delete(item.idItem);
-      if (res && parseInt(res.status) === 200) {
-        showToast('Barang berhasil dihapus!', 'success');
+      const itemId = item?.idItem || item?.id;
+      const res = await api.items.delete(itemId);
+      if (res && (parseInt(res.status) === 200 || res.status === 200 || res.status === '200' || res.success)) {
+        showToast(t('detail.delete_success') || 'Barang berhasil dihapus!', 'success');
         navigation.goBack();
       } else {
-        showToast(res.message || 'Gagal menghapus.', 'danger');
+        showToast(res?.message || t('detail.delete_fail') || 'Gagal menghapus.', 'danger');
         setLoading(false);
       }
-    } catch {
-      showToast('Gagal terhubung ke server', 'danger');
+    } catch (err) {
+      showToast(t('auth.server_error') || 'Gagal terhubung ke server', 'danger');
       setLoading(false);
     }
   };
@@ -447,6 +546,8 @@ export default function DetailScreen({ route, navigation }) {
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={(_, h) => setScrollContentHeight(h)}
+        onLayout={(e) => setScrollLayoutHeight(e.nativeEvent.layout.height)}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true }
@@ -531,7 +632,12 @@ export default function DetailScreen({ route, navigation }) {
           >
             <View style={styles.badgesRow}>
               <View style={[styles.badge, { backgroundColor: Colors.primary.yellow500 }]}>
-                <CustomText style={styles.badgeText}>{item.condition}</CustomText>
+                <CustomText style={styles.badgeText}>
+                  {item.condition === 'Sangat Baik' ? t('postitem.cond_vg') :
+                   item.condition === 'Baik' ? t('postitem.cond_good') :
+                   item.condition === 'Kurang' ? t('postitem.cond_poor') :
+                   item.condition}
+                </CustomText>
               </View>
               <View style={[styles.badge, { backgroundColor: getStatusColor(item.status) }]}>
                 <CustomText style={[styles.badgeText, { color: Colors.common.white }]}>{getStatusText(item.status)}</CustomText>
@@ -557,7 +663,13 @@ export default function DetailScreen({ route, navigation }) {
             <View style={[styles.categoryBadge, { backgroundColor: isDark ? Colors.dark.surface : Colors.light.border }]}>
               <Ionicons name="pricetags-outline" size={11} color={theme.text.secondary} style={{ marginRight: 6 }} />
               <CustomText style={[styles.categoryBadgeText, { color: theme.text.secondary }]}>
-                {item.categoryName || 'Kategori'}
+                {(() => {
+                  const catId = item.idCategory || item.categoryId || (item.categoryName && item.categoryName.startsWith('CAT') ? item.categoryName : null);
+                  if (catId) {
+                    return t(`category.${catId.toLowerCase()}`);
+                  }
+                  return item.categoryName || t('common.category');
+                })()}
               </CustomText>
             </View>
           </View>
@@ -567,7 +679,7 @@ export default function DetailScreen({ route, navigation }) {
 
           {/* Lokasi */}
           <AccordionSection
-            title="Lokasi Pertemuan"
+            title={t('detail.meeting_location')}
             isOpen={openSections.lokasi}
             onToggle={() => toggleSection('lokasi')}
             theme={theme}
@@ -596,7 +708,7 @@ export default function DetailScreen({ route, navigation }) {
               <>
                 <View style={[styles.divider, { backgroundColor: theme.border }]} />
                 <AccordionSection
-                  title={t('detail.checksheet_title') || (locale === 'id' ? "Kondisi Fisik (Check Sheet)" : "Physical Condition (Check Sheet)")}
+                  title={t('detail.checksheet_title')}
                   isOpen={openSections.checksheet}
                   onToggle={() => toggleSection('checksheet')}
                   theme={theme}
@@ -616,25 +728,7 @@ export default function DetailScreen({ route, navigation }) {
                     </View>
                   }
                 >
-                  {pct === 100 ? (
-                    /* 100% OK State — Super clean, aesthetic */
-                    <View style={{ 
-                      flexDirection: 'row', 
-                      alignItems: 'center', 
-                      backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(240,253,244,0.6)', 
-                      borderColor: isDark ? 'rgba(16,185,129,0.2)' : 'rgba(220,252,231,1)',
-                      borderWidth: 1, 
-                      padding: 14, 
-                      borderRadius: 12,
-                      gap: 10
-                    }}>
-                      <Ionicons name="checkmark-done-circle" size={22} color={Colors.semantic.success.main} />
-                      <CustomText style={{ flex: 1, color: theme.text.primary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
-                        {locale === 'id' ? 'Semua kondisi fisik berfungsi dengan baik (100% OK)' : 'All physical conditions are functioning well (100% OK)'}
-                      </CustomText>
-                    </View>
-                  ) : (
-                    /* Has Flaws State */
+                  {failedPoints.length > 0 && (
                     <View style={{ gap: 12 }}>
                       {/* Warning Summary Banner */}
                       <View style={{ 
@@ -650,7 +744,7 @@ export default function DetailScreen({ route, navigation }) {
                         <Ionicons name="alert-circle" size={22} color={Colors.semantic.error.main} />
                         <View style={{ flex: 1 }}>
                           <CustomText style={{ color: theme.text.primary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
-                            {locale === 'id' ? `Terdapat ${failedPoints.length} catatan minus dari penjual` : `There are ${failedPoints.length} minus notes from the seller`}
+                            {t('detail.checksheet_failed_count').replace('{count}', failedPoints.length)}
                           </CustomText>
                         </View>
                       </View>
@@ -713,12 +807,12 @@ export default function DetailScreen({ route, navigation }) {
                       <View style={{ flex: 1, height: 20, justifyContent: 'center' }}>
                         <Animated.View style={{ position: 'absolute', left: 0, opacity: opacityOpen }}>
                           <CustomText style={{ color: Colors.primary.blue500, fontFamily: 'Barlow-Bold', fontSize: 13 }}>
-                            {locale === 'id' ? 'Lihat Semua Pengecekan' : 'View All Checks'}
+                            {t('detail.view_checks')}
                           </CustomText>
                         </Animated.View>
                         <Animated.View style={{ position: 'absolute', left: 0, opacity: opacityClose }}>
                           <CustomText style={{ color: Colors.primary.blue500, fontFamily: 'Barlow-Bold', fontSize: 13 }}>
-                            {locale === 'id' ? 'Sembunyikan Pengecekan' : 'Hide Checks'}
+                            {t('detail.hide_checks')}
                           </CustomText>
                         </Animated.View>
                       </View>
@@ -738,10 +832,10 @@ export default function DetailScreen({ route, navigation }) {
                       onLayout={(e) => {
                         const h = e.nativeEvent.layout.height;
                         if (h > 0 && Math.abs(h - subListHeight) > 1) {
-                          setSubListHeight(h);
+                          setSubListHeight(h + 8);
                         }
                       }}
-                      style={{ position: 'absolute', width: '100%', top: 0, left: 0 }}
+                      style={{ position: 'absolute', width: '100%', top: 0, left: 0, paddingBottom: 6 }}
                     >
                       <View style={{ 
                         marginTop: -6, 
@@ -755,7 +849,7 @@ export default function DetailScreen({ route, navigation }) {
                         borderTopLeftRadius: 0,
                         borderTopRightRadius: 0,
                         paddingTop: 18,
-                        paddingBottom: 14,
+                        paddingBottom: 16,
                         paddingHorizontal: 14, 
                         gap: 12,
                         elevation: 1,
@@ -792,7 +886,7 @@ export default function DetailScreen({ route, navigation }) {
 
           {/* Deskripsi */}
           <AccordionSection
-            title="Deskripsi"
+            title={t('detail.description')}
             isOpen={openSections.deskripsi}
             onToggle={() => toggleSection('deskripsi')}
             theme={theme}
@@ -809,7 +903,7 @@ export default function DetailScreen({ route, navigation }) {
 
               {/* Penjual */}
               <AccordionSection
-                title="Penjual"
+                title={t('detail.seller')}
                 isOpen={openSections.penjual}
                 onToggle={() => toggleSection('penjual')}
                 theme={theme}
@@ -839,20 +933,42 @@ export default function DetailScreen({ route, navigation }) {
       ]}>
         {isOwner ? (
           <View style={{ flex: 1, flexDirection: 'row', gap: 10 }}>
+            {/* Delete Button - Disabled if Sold or Booked */}
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={(item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked') ? 1 : 0.8}
+              disabled={item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked'}
               onPress={() => setDeleteAlertVisible(true)}
-              style={[styles.deleteBtn, { borderColor: Colors.semantic.error.main }]}
+              style={[
+                styles.deleteBtn, 
+                { 
+                  borderColor: (item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked') ? theme.border : Colors.semantic.error.main,
+                  opacity: (item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked') ? 0.4 : 1,
+                }
+              ]}
             >
-              <Ionicons name="trash-outline" size={20} color={Colors.semantic.error.main} />
+              <Ionicons 
+                name="trash-outline" 
+                size={20} 
+                color={(item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked') ? theme.text.secondary : Colors.semantic.error.main} 
+              />
             </TouchableOpacity>
+
+            {/* Edit Button - Disabled if Sold or Booked */}
             <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => showToast('Fitur edit barang segera hadir', 'info')}
-              style={[styles.ctaBtn, { flex: 1, backgroundColor: theme.text.heading }]}
+              activeOpacity={(item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked') ? 1 : 0.8}
+              disabled={item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked'}
+              onPress={() => navigation.navigate('PostItem', { editMode: true, item })}
+              style={[
+                styles.ctaBtn, 
+                { 
+                  flex: 1, 
+                  backgroundColor: theme.text.heading,
+                  opacity: (item?.status?.toLowerCase() === 'sold' || item?.status?.toLowerCase() === 'booked') ? 0.4 : 1,
+                }
+              ]}
             >
               <Ionicons name="pencil-outline" size={18} color={isDark ? Colors.dark.background : Colors.light.surface} style={{ marginRight: 8 }} />
-              <CustomText style={[styles.ctaBtnText, { color: isDark ? Colors.dark.background : Colors.light.surface }]}>Edit Barang</CustomText>
+              <CustomText style={[styles.ctaBtnText, { color: isDark ? Colors.dark.background : Colors.light.surface }]}>{t('detail.edit_item') || 'Edit Barang'}</CustomText>
             </TouchableOpacity>
           </View>
         ) : (
@@ -861,7 +977,16 @@ export default function DetailScreen({ route, navigation }) {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleToggleFavorite}
-              style={[styles.iconActionBtn, { backgroundColor: isDark ? Colors.dark.surface : Colors.light.border }]}
+              style={[
+                styles.iconActionBtn, 
+                { 
+                  backgroundColor: isFavorite 
+                    ? (isDark ? 'rgba(255, 214, 0, 0.2)' : '#FEF3C7') 
+                    : (isDark ? Colors.dark.surface : Colors.light.border),
+                  borderColor: isFavorite ? (isDark ? Colors.primary.yellow500 : '#F59E0B') : 'transparent',
+                  borderWidth: isFavorite ? 1.5 : 0
+                }
+              ]}
             >
               {/* Partikel Bulet-Bulet (sama persis kayak ProductCard) */}
               {Array.from({ length: 6 }).map((_, i) => {
@@ -898,7 +1023,7 @@ export default function DetailScreen({ route, navigation }) {
                       },
                     ]}
                   >
-                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.primary.yellow500 }} />
+                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isDark ? Colors.primary.yellow500 : '#D97706' }} />
                   </Animated.View>
                 );
               })}
@@ -908,7 +1033,7 @@ export default function DetailScreen({ route, navigation }) {
                 <Ionicons
                   name={isFavorite ? 'cart' : 'cart-outline'}
                   size={22}
-                  color={isFavorite ? Colors.primary.yellow500 : theme.text.secondary}
+                  color={isFavorite ? (isDark ? Colors.primary.yellow500 : '#B45309') : theme.text.secondary}
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -917,10 +1042,19 @@ export default function DetailScreen({ route, navigation }) {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleContactSeller}
-              style={[styles.ctaBtn, { flex: 1, backgroundColor: Colors.semantic.whatsapp }]}
+              disabled={isCheckingOut}
+              style={[styles.ctaBtn, { flex: 1, backgroundColor: isCheckingOut ? Colors.semantic.whatsapp + '99' : Colors.semantic.whatsapp }]}
             >
-              <Ionicons name="logo-whatsapp" size={20} color={Colors.common.white} style={{ marginRight: 8 }} />
-              <CustomText style={[styles.ctaBtnText, { color: Colors.common.white }]}>{locale === 'id' ? 'Hubungi via WA' : 'Contact via WA'}</CustomText>
+              {isCheckingOut ? (
+                <ActivityIndicator size="small" color={Colors.common.white} />
+              ) : (
+                <>
+                  <Ionicons name="logo-whatsapp" size={20} color={Colors.common.white} style={{ marginRight: 8 }} />
+                  <CustomText style={[styles.ctaBtnText, { color: Colors.common.white }]}>
+                    {t('detail.contact_wa') || 'Hubungi via WA'}
+                  </CustomText>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -930,15 +1064,122 @@ export default function DetailScreen({ route, navigation }) {
       <CustomAlert
         visible={isDeleteAlertVisible}
         type="danger"
-        title="Hapus Barang?"
-        message="Apakah Anda yakin ingin menghapus barang ini secara permanen dari Thriftly?"
+        title={t('detail.delete_title') || 'Hapus Barang?'}
+        message={t('detail.delete_msg') || 'Apakah Anda yakin ingin menghapus barang ini secara permanen dari Thriftly?'}
         showCancel
-        confirmText="Hapus"
-        cancelText="Batal"
+        confirmText={t('detail.delete_btn') || 'Hapus'}
+        cancelText={t('profile.cancel') || 'Batal'}
         onConfirm={handleDeleteItem}
         onCancel={() => setDeleteAlertVisible(false)}
         onClose={() => setDeleteAlertVisible(false)}
       />
+
+      {/* Modal Buat Janji COD (Identik dengan CartScreen) */}
+      <Modal
+        visible={isWaModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsWaModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            activeOpacity={1}
+            style={styles.modalBackdrop}
+            onPress={() => setIsWaModalVisible(false)}
+          />
+          
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardView}
+          >
+            <View style={styles.modalShadowContainer}>
+              <View style={[styles.bottomSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={styles.sheetHandler} />
+                
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <CustomText style={[styles.modalTitle, { color: theme.text.primary }]}>
+                    {t('cart.confirm_title') || 'Buat Janji COD'}
+                  </CustomText>
+                  <TouchableOpacity 
+                    onPress={() => setIsWaModalVisible(false)}
+                    style={styles.closeModalBtn}
+                  >
+                    <Ionicons name="close" size={22} color={theme.text.secondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <CustomText style={[styles.modalSellerLabel, { color: theme.text.secondary }]}>
+                    {t('cart.arrange_cod') || 'Membuat janji COD dengan penjual:'}
+                  </CustomText>
+                  <CustomText style={[styles.modalSellerName, { color: theme.text.primary }]}>
+                    {item?.sellerName || 'Penjual'}
+                  </CustomText>
+
+                  {/* Items Summary list */}
+                  <View style={[styles.modalItemsBox, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background, borderColor: theme.border }]}>
+                    <View style={styles.modalItemSummaryRow}>
+                      <CustomText style={{ color: theme.text.primary, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                        • {item?.title}
+                      </CustomText>
+                      <CustomText style={{ color: theme.text.secondary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
+                        {formatCurrency(item?.price || 0)}
+                      </CustomText>
+                    </View>
+                    <View style={[styles.modalDivider, { backgroundColor: theme.border }]} />
+                    <View style={styles.modalItemSummaryRow}>
+                      <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 14 }}>
+                        Total:
+                      </CustomText>
+                      <CustomText style={{ color: Colors.primary.yellow500, fontFamily: 'Barlow-Bold', fontSize: 15 }}>
+                        {formatCurrency(item?.price || 0)}
+                      </CustomText>
+                    </View>
+                  </View>
+
+                  {/* Meeting Notes Input */}
+                  <CustomText style={[styles.inputLabel, { color: theme.text.primary }]}>
+                    {t('cart.note_label') || 'Catatan:'}
+                  </CustomText>
+                  <TextInput
+                    value={waMeetingNote}
+                    onChangeText={setWaMeetingNote}
+                    placeholder={t('cart.note_placeholder') || 'Tulis catatan di sini...'}
+                    placeholderTextColor={theme.text.secondary + '80'}
+                    multiline={true}
+                    numberOfLines={4}
+                    style={[styles.textInput, { 
+                      color: theme.text.primary,
+                      borderColor: theme.border,
+                      backgroundColor: isDark ? Colors.dark.background : Colors.common.white
+                    }]}
+                  />
+
+                  {/* Actions */}
+                  <TouchableOpacity 
+                    activeOpacity={0.8}
+                    style={[styles.submitCheckoutBtn, { backgroundColor: Colors.semantic.whatsapp }]}
+                    onPress={confirmCheckoutAndWA}
+                    disabled={isCheckingOut}
+                  >
+                    {isCheckingOut ? (
+                      <ActivityIndicator size="small" color={Colors.common.white} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-whatsapp" size={18} color={Colors.common.white} style={{ marginRight: 8 }} />
+                        <CustomText style={styles.submitCheckoutBtnText}>
+                          {t('cart.submit_cod') || 'Ajukan & Hubungi WA'}
+                        </CustomText>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1189,5 +1430,111 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  /* Modal Styles (Identik dengan CartScreen) */
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  keyboardView: {
+    width: '100%',
+  },
+  modalShadowContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    ...Shadows.primary,
+    elevation: 20,
+    backgroundColor: 'transparent',
+    maxHeight: '90%',
+  },
+  bottomSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1.5,
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+    overflow: 'hidden',
+  },
+  sheetHandler: {
+    width: 48,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(150, 150, 150, 0.3)',
+    alignSelf: 'center',
+    marginBottom: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontFamily: 'Barlow-Black',
+    fontSize: 22,
+    lineHeight: 28,
+    paddingVertical: 2,
+  },
+  closeModalBtn: {
+    padding: 4,
+  },
+  modalSellerLabel: {
+    fontSize: 13,
+  },
+  modalSellerName: {
+    fontFamily: 'Barlow-Bold',
+    fontSize: 18,
+    marginTop: 2,
+  },
+  modalItemsBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginVertical: 16,
+    gap: 8,
+  },
+  modalItemSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalDivider: {
+    height: 1,
+    marginVertical: 4,
+  },
+  inputLabel: {
+    fontFamily: 'Barlow-Bold',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  textInput: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 14,
+    fontSize: 14,
+    fontFamily: 'Barlow-Medium',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  submitCheckoutBtn: {
+    height: 52,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: Platform.OS === 'ios' ? 20 : 10,
+  },
+  submitCheckoutBtnText: {
+    fontFamily: 'Barlow-Bold',
+    color: Colors.common.white,
+    fontSize: 14,
   },
 });

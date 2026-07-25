@@ -13,7 +13,7 @@ const apiClient = axios.create({
   timeout: 10000,
 });
 
-/* ---------- Axios Interceptor ---------- */
+/* ---------- Interseptor Axios ---------- */
 apiClient.interceptors.request.use(
   async (config) => {
     try {
@@ -22,7 +22,7 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (e) {
-      console.log('Gagal mengambil token untuk interceptor', e);
+      void 0;
     }
     return config;
   },
@@ -31,7 +31,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-/* ---------- API Endpoints ---------- */
+/* ---------- Titik Akhir API ---------- */
 
 const api = {
   auth: {
@@ -43,7 +43,7 @@ const api = {
       const response = await apiClient.post("/auth/register", userData);
       return response.data;
     },
-    
+
     /**
      * Login
      * Autentikasi pengguna menggunakan NIM/Email dan password.
@@ -74,7 +74,7 @@ const api = {
     verifyOtp: async (nim, otpCode) => {
       const response = await apiClient.post("/auth/verify-otp", {
         nim,
-        otpCode,
+        otp: otpCode,
       });
       return response.data;
     },
@@ -86,7 +86,7 @@ const api = {
     resetPassword: async (nim, otpCode, newPassword) => {
       const response = await apiClient.post("/auth/reset-password", {
         nim,
-        otpCode,
+        otp: otpCode,
         newPassword,
       });
       return response.data;
@@ -130,6 +130,22 @@ const api = {
         newPassword,
         confirmPassword
       });
+      return response.data;
+    },
+    /**
+     * Save Expo Push Token
+     * Mengirimkan token notifikasi ke backend.
+     */
+    saveToken: async (token) => {
+      const response = await apiClient.post("/profile/save-token", { token });
+      return response.data;
+    },
+    /**
+     * Update Notification Status
+     * Mengubah preferensi push notification di backend.
+     */
+    updateNotifStatus: async (enabled) => {
+      const response = await apiClient.put("/profile/notification-status", { enabled });
       return response.data;
     }
   },
@@ -186,8 +202,8 @@ const api = {
      * Get My Items
      * Mengambil daftar barang milik user yang sedang login.
      */
-    getMy: async (status) => {
-      const response = await apiClient.get("/item/my", { params: { status } });
+    getMy: async (params) => {
+      const response = await apiClient.get("/item/my", { params });
       return response.data;
     },
 
@@ -208,16 +224,6 @@ const api = {
       const response = await apiClient.put(`/item/${id}`, itemData);
       return response.data;
     },
-
-    /**
-     * Update Item Status
-     * Mengubah status jualan barang (Available, Booked, Sold).
-     */
-    updateStatus: async (id, status) => {
-      const response = await apiClient.put(`/item/${id}/status`, { status });
-      return response.data;
-    },
-
     /**
      * Delete Item
      * Menghapus listing barang milik sendiri dari server.
@@ -232,12 +238,12 @@ const api = {
       const response = await apiClient.post("/transaction/checkout", { itemIds, meetingNote });
       return response.data;
     },
-    getBuyerTransactions: async () => {
-      const response = await apiClient.get("/transaction/buyer");
+    getBuyerTransactions: async (params) => {
+      const response = await apiClient.get("/transaction/buyer", { params });
       return response.data;
     },
-    getSellerTransactions: async () => {
-      const response = await apiClient.get("/transaction/seller");
+    getSellerTransactions: async (params) => {
+      const response = await apiClient.get("/transaction/seller", { params });
       return response.data;
     },
     updateStatus: async (id, status) => {
@@ -248,6 +254,20 @@ const api = {
   checksheet: {
     getTemplates: async (categoryId) => {
       const response = await apiClient.get(`/checksheet/template/${categoryId}`);
+      return response.data;
+    }
+  },
+  notifications: {
+    get: async (params) => {
+      const response = await apiClient.get("/notifications", { params });
+      return response.data;
+    },
+    markAsRead: async (id) => {
+      const response = await apiClient.patch(`/notifications/${id}/read`);
+      return response.data;
+    },
+    delete: async (ids) => {
+      const response = await apiClient.delete("/notifications", { data: { ids } });
       return response.data;
     }
   }

@@ -1,5 +1,5 @@
 /* ==========================================
-   Custom Button
+   Komponen Layar Custom Button
 ========================================== */
 import React from 'react';
 import {
@@ -100,7 +100,7 @@ export default function CustomButton({
   );
 }
 
-/* Styles */
+/* ---------- Gaya ---------- */
 
 const getStyles = (theme, isDark) => {
   return StyleSheet.create({
@@ -111,7 +111,7 @@ const getStyles = (theme, isDark) => {
       borderRadius: 14,
       gap: 8,
     },
-    /* Sizes */
+    /* ---------- Ukuran ---------- */
     small: {
       height: 38,
       paddingHorizontal: 16,
@@ -127,7 +127,7 @@ const getStyles = (theme, isDark) => {
       paddingHorizontal: 32,
       borderRadius: 16,
     },
-    /* Types */
+    /* ---------- Tipe ---------- */
     primary: {
       backgroundColor: Colors.primary.blue500,
       ...Shadows.primary,
@@ -153,7 +153,7 @@ const getStyles = (theme, isDark) => {
       shadowOpacity: 0,
       elevation: 0,
     },
-    /* Text Styles */
+    /* ---------- Gaya Teks ---------- */
     text: {
       fontFamily: 'Barlow-Bold',
       textAlign: 'center',

@@ -1,5 +1,5 @@
 /* ==========================================
-   Toast
+   Komponen Layar Toast
 ========================================== */
 import React, { createContext, useContext, useState, useRef } from "react";
 import { StyleSheet, View, Text, Animated, Platform, TouchableOpacity } from "react-native";
@@ -186,7 +186,7 @@ export function ToastProvider({ children }) {
   );
 }
 
-/* Styles */
+/* ---------- Gaya ---------- */
 
 const styles = StyleSheet.create({
   toastContainer: {

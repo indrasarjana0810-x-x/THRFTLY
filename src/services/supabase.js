@@ -49,7 +49,7 @@ export const uploadImageToSupabase = async (localUri, folder = 'avatars') => {
       
     return publicUrlData.publicUrl;
   } catch (error) {
-    console.error('Error uploading image to Supabase:', error);
+    void 0;
     throw error;
   }
 };
@@ -74,10 +74,10 @@ export const deleteImageFromSupabase = async (publicUrl) => {
         .remove([filePath]);
         
       if (error) {
-        console.error('Gagal menghapus gambar lama dari Supabase:', error);
+        void 0;
       }
     }
   } catch (error) {
-    console.error('Error saat menghapus gambar Supabase:', error);
+    void 0;
   }
 };

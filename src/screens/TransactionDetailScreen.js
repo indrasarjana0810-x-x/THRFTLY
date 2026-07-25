@@ -30,10 +30,10 @@ export default function TransactionDetailScreen({ route, navigation }) {
   if (!transaction) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <Header title={locale === 'id' ? 'Detail Transaksi' : 'Transaction Details'} />
+        <Header title={t('history.trans_detail_title') || 'Detail Transaksi'} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <CustomText style={{ color: theme.text.primary }}>
-            {locale === 'id' ? 'Transaksi tidak ditemukan.' : 'Transaction not found.'}
+            {t('history.not_found') || 'Transaksi tidak ditemukan.'}
           </CustomText>
         </View>
       </SafeAreaView>
@@ -52,11 +52,11 @@ export default function TransactionDetailScreen({ route, navigation }) {
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'Completed': return locale === 'id' ? 'Selesai' : 'Completed';
-      case 'Cancelled': return locale === 'id' ? 'Dibatalkan' : 'Cancelled';
-      case 'Rejected': return locale === 'id' ? 'Ditolak' : 'Rejected';
-      case 'Accepted': return locale === 'id' ? 'Diterima' : 'Accepted';
-      default: return locale === 'id' ? 'Menunggu' : 'Pending';
+      case 'Completed': return t('status.completed') || 'Selesai';
+      case 'Cancelled': return t('status.cancelled') || 'Dibatalkan';
+      case 'Rejected': return t('status.rejected') || 'Ditolak';
+      case 'Accepted': return t('status.accepted') || 'COD Berlangsung';
+      default: return t('status.pending') || 'Menunggu';
     }
   };
 
@@ -72,7 +72,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Header title={locale === 'id' ? 'Detail Transaksi' : 'Transaction Details'} noBorder={true} />
+      <Header title={t('history.trans_detail_title') || 'Detail Transaksi'} noBorder={true} />
       
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24, paddingTop: 16 }}>
         
@@ -83,7 +83,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <View>
               <CustomText style={{ color: theme.text.secondary, fontSize: 13, marginBottom: 2 }}>
-                {locale === 'id' ? 'Tanggal Transaksi' : 'Transaction Date'}
+                {t('history.trans_date') || 'Tanggal Transaksi'}
               </CustomText>
               <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 14 }}>
                 {new Date(transaction.transDate).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', {
@@ -103,7 +103,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
           {/* Info Partner */}
           <View style={styles.section}>
             <CustomText style={{ color: theme.text.secondary, fontSize: 13, marginBottom: 12 }}>
-              {role === 'buyer' ? (locale === 'id' ? 'Informasi Penjual' : 'Seller Info') : (locale === 'id' ? 'Informasi Pembeli' : 'Buyer Info')}
+              {role === 'buyer' ? (t('history.seller_label') || 'Penjual:') : (t('history.buyer_label') || 'Pembeli:')}
             </CustomText>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Avatar name={partner?.name} imageUrl={partner?.profile} size={42} />
@@ -123,7 +123,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
           {/* Detail Pesanan */}
           <View style={styles.section}>
             <CustomText style={[styles.sectionTitle, { color: theme.text.secondary, marginBottom: 12 }]}>
-              {locale === 'id' ? 'Detail Pesanan' : 'Order Details'}
+              {t('postitem.detail') || 'Detail Pesanan'}
             </CustomText>
             <View style={{ gap: 12 }}>
               {transaction.details.map((detail, idx) => {
@@ -173,7 +173,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
               <View style={[styles.dashedDivider, { borderColor: theme.border }]} />
               <View style={{ paddingVertical: 16 }}>
                 <CustomText style={{ color: theme.text.secondary, fontSize: 13, marginBottom: 8 }}>
-                  {locale === 'id' ? 'Catatan COD' : 'COD Notes'}
+                  {t('history.cod_notes') || 'Catatan COD'}
                 </CustomText>
                 <View style={[styles.noteBox, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)', borderWidth: 1, borderColor: theme.border, padding: 12, borderRadius: 8 }]}>
                   <Ionicons name="chatbox-ellipses-outline" size={16} color={theme.text.secondary} style={{ marginRight: 8, marginTop: 2 }} />
@@ -190,7 +190,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
           {/* Total Belanja */}
           <View style={[styles.rowBetween, { paddingTop: 16 }]}>
             <CustomText style={{ color: theme.text.secondary, fontSize: 14, fontFamily: 'Barlow-Bold' }}>
-              {locale === 'id' ? 'Total Belanja' : 'Total Price'}
+              {t('history.total_label') || 'Total:'}
             </CustomText>
             <CustomText style={[styles.totalPrice, { color: theme.text.primary, fontSize: 16 }]}>
               {formatCurrency(transaction.totalTrx)}

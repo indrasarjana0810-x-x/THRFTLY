@@ -1,7 +1,7 @@
 /* ==========================================
-   Splash Screen Component
+   Komponen Layar Komponen Splash
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useEffect, useRef } from "react";
 import {
   StyleSheet,
@@ -21,7 +21,7 @@ import ThriftlyLogo from "../components/ThriftlyLogo";
  * Terdiri dari animasi logo dan teks.
  */
 export default function SplashScreen({ onFinish, darkMode = false }) {
-  /* ---------- Component States & Refs ---------- */
+  /* ---------- State & Ref Komponen ---------- */
   const logoScale = useRef(new Animated.Value(0.75)).current;
   const logoTranslateY = useRef(new Animated.Value(25)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -39,7 +39,7 @@ export default function SplashScreen({ onFinish, darkMode = false }) {
   const hasFinishedRef = useRef(false);
   const logoBreath = useRef(new Animated.Value(1)).current;
 
-  /* ---------- UI Logics & Handlers ---------- */
+  /* ---------- Logika Antarmuka & Penanganan ---------- */
   const triggerExit = () => {
     if (hasFinishedRef.current) return;
     hasFinishedRef.current = true;
@@ -62,7 +62,7 @@ export default function SplashScreen({ onFinish, darkMode = false }) {
     });
   };
 
-  /* ---------- Lifecycle (Mounting/Unmounting) ---------- */
+  /* ---------- Siklus Hidup (Mounting/Unmounting) ---------- */
   useEffect(() => {
     // 1. Fase Pertama: Ledakan & munculkan logo + Ambient Glow (600ms)
     Animated.parallel([
@@ -133,7 +133,7 @@ export default function SplashScreen({ onFinish, darkMode = false }) {
   const textColor = darkMode ? Colors.dark.text.secondary : Colors.light.text.secondary;
   const glowColor = Colors.primary.blue500;
 
-  /* ---------- Render ---------- */
+  /* ---------- Tampilan ---------- */
   return (
     <TouchableOpacity
       activeOpacity={1}
@@ -207,7 +207,7 @@ export default function SplashScreen({ onFinish, darkMode = false }) {
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Gaya ---------- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,

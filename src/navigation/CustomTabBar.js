@@ -1,7 +1,7 @@
 /* ==========================================
-   Custom Tab Bar Component
+   Komponen Custom Tab Bar
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useEffect, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Dimensions, useColorScheme, Animated } from 'react-native';
 import Svg, { Path } from 'react-native-svg';

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "",
+    "name": "THRIFTLY",
     "slug": "THRIFTLY",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,16 +8,20 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.THRIFTLY",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive_icon.png",
         "backgroundColor": "#ffffff"
       },
+      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.anonymous.THRIFTLY"
@@ -45,7 +49,20 @@
           "photosPermission": "Aplikasi butuh akses galeri foto untuk mengunggah foto profil dan foto produk.",
           "cameraPermission": "Aplikasi butuh akses kamera untuk mengambil foto produk secara langsung."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f2585e9a-fba1-42b0-bb70-87004a981cf3"
+      }
+    }
   }
 }

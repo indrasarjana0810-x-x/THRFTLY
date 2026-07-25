@@ -1,7 +1,7 @@
 /* ==========================================
-   Profile Screen
+   Komponen Layar Profile
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -27,6 +27,7 @@ import Colors from '../constants/colors';
 import { Shadows } from '../constants/styles';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectAuthUser, selectAuthToken, logout, setCredentials } from '../store/slices/authSlice';
+import { clearCart } from '../store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
@@ -35,8 +36,20 @@ import { useToast } from '../components/Toast';
 import { useLanguage } from '../localization/LanguageContext';
 import CustomToggle from '../components/CustomToggle';
 
+const STUDY_PROGRAM_KEYS = [
+  { key: 'prodi.tr_alat_berat', dbValue: 'Teknologi Rekayasa Pemeliharaan Alat Berat' },
+  { key: 'prodi.tr_logistik', dbValue: 'Teknologi Rekayasa Logistik' },
+  { key: 'prodi.tr_rpl', dbValue: 'Teknologi Rekayasa Perangkat Lunak' },
+  { key: 'prodi.perkakas_produksi', dbValue: 'Pembuatan Peralatan dan Perkakas Produksi' },
+  { key: 'prodi.proses_manufaktur', dbValue: 'Teknik Produksi dan Proses Manufaktur' },
+  { key: 'prodi.konstruksi_gedung', dbValue: 'Teknologi Konstruksi Bangunan Gedung' },
+  { key: 'prodi.mesin_otomotif', dbValue: 'Mesin Otomotif' },
+  { key: 'prodi.mekatronika', dbValue: 'Mekatronika' },
+  { key: 'prodi.manajemen_informatika', dbValue: 'Manajemen Informatika' },
+];
+
 /* ==========================================
-   Main Component
+   Komponen Layar Komponen Main
 ========================================== */
 export default function ProfileScreen({ navigation }) {
   const colorScheme = useColorScheme();
@@ -46,6 +59,22 @@ export default function ProfileScreen({ navigation }) {
   const [alertVisible, setAlertVisible] = useState(false);
   const [notifGlobal, setNotifGlobal] = useState(true);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    AsyncStorage.getItem('notifGlobal').then(val => {
+      if (val !== null) setNotifGlobal(val === 'true');
+    });
+  }, []);
+
+  const handleNotifToggle = async (val) => {
+    setNotifGlobal(val);
+    await AsyncStorage.setItem('notifGlobal', val.toString());
+    try {
+      await api.users.updateNotifStatus(val);
+    } catch (e) {
+      // Biarkan gagal diam-diam jika backend belum mendukung endpoint ini
+    }
+  };
 
   const dispatch = useDispatch();
   const user = useSelector(selectAuthUser);
@@ -99,15 +128,15 @@ export default function ProfileScreen({ navigation }) {
       ]
     },
     {
-      title: t('profile.preferences') || 'Preferensi',
+      title: t('profile.preferences'),
       data: [
-        { id: 'language', title: t('profile.language'), desc: locale === 'id' ? 'Indonesia' : 'English', icon: 'language-outline', color: Colors.primary.blue500, type: 'language' },
-        { id: 'notification', title: t('profile.menu_notification') || 'Notifikasi', desc: t('profile.desc_notification') || 'Peringatan & pesan', icon: 'notifications-outline', color: Colors.semantic.info.main, type: 'toggle' },
+        { id: 'language', title: t('profile.language'), desc: locale === 'id' ? t('profile.lang_indonesia') : t('profile.lang_english'), icon: 'language-outline', color: Colors.primary.blue500, type: 'language' },
+        { id: 'notification', title: t('profile.menu_notification'), desc: t('profile.desc_notification'), icon: 'notifications-outline', color: Colors.semantic.info.main, type: 'toggle' },
       ]
     }
   ];
 
-  /* ---------- Handlers ---------- */
+  /* ---------- Fungsi Penanganan ---------- */
   const handleMenuPress = (menu) => {
     if (menu.id === 'account') {
       navigation.navigate('AccountCenter');
@@ -136,9 +165,10 @@ export default function ProfileScreen({ navigation }) {
     try {
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('userProfile');
+      dispatch(clearCart());
       dispatch(logout());
     } catch (e) {
-      console.log('Error clearing token', e);
+      void 0;
     }
   };
 
@@ -146,7 +176,7 @@ export default function ProfileScreen({ navigation }) {
 
 
 
-  /* ---------- Render ---------- */
+  /* ---------- Tampilan ---------- */
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -163,7 +193,16 @@ export default function ProfileScreen({ navigation }) {
             </CustomText>
             
             <CustomText type="caption" style={[styles.profileCardNim, { color: theme.text.secondary }]} numberOfLines={1}>
-              {[user?.idUser, user?.studyProgram].filter(Boolean).join(' · ') || user?.email || ''}
+              {(() => {
+                let displayProdi = user?.studyProgram;
+                if (displayProdi) {
+                  const found = STUDY_PROGRAM_KEYS.find(sp => sp.dbValue === displayProdi);
+                  if (found) {
+                    displayProdi = t(found.key) || displayProdi;
+                  }
+                }
+                return [user?.idUser, displayProdi].filter(Boolean).join(' · ') || user?.email || '';
+              })()}
             </CustomText>
           </View>
         </View>
@@ -201,7 +240,7 @@ export default function ProfileScreen({ navigation }) {
                     {menu.type === 'toggle' ? (
                       <CustomToggle
                         value={notifGlobal}
-                        onValueChange={setNotifGlobal}
+                        onValueChange={handleNotifToggle}
                       />
                     ) : (
                       <MaterialIcons name="chevron-right" size={20} color={theme.text.placeholder} />
@@ -213,10 +252,16 @@ export default function ProfileScreen({ navigation }) {
           </View>
         ))}
 
-        {/* --- LOGOUT BUTTON --- */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="logout" size={20} color={Colors.semantic.error.main} />
-          <CustomText type="body-bold" style={{ color: Colors.semantic.error.main, marginLeft: 8 }}>{t('profile.logout')}</CustomText>
+        {/* --- LOGOUT BUTTON (FAB SOLID DANGER STYLE) --- */}
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleLogout} 
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name="logout" size={20} color={Colors.common.white} />
+          <CustomText type="body-bold" style={{ color: Colors.common.white, marginLeft: 8, fontSize: 15 }}>
+            {t('profile.logout')}
+          </CustomText>
         </TouchableOpacity>
         
         {/* Padding untuk Tab Bar */}
@@ -268,7 +313,7 @@ export default function ProfileScreen({ navigation }) {
                 ]} 
                 onPress={() => { switchLanguage('id'); closeLangModal(); }}
               >
-                <CustomText type="body-bold" style={{ color: locale === 'id' ? Colors.light.surface : theme.text.primary }}>Indonesia</CustomText>
+                <CustomText type="body-bold" style={{ color: locale === 'id' ? Colors.light.surface : theme.text.primary }}>{t('profile.lang_indonesia')}</CustomText>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -278,7 +323,7 @@ export default function ProfileScreen({ navigation }) {
                 ]} 
                 onPress={() => { switchLanguage('en'); closeLangModal(); }}
               >
-                <CustomText type="body-bold" style={{ color: locale === 'en' ? Colors.light.surface : theme.text.primary }}>English</CustomText>
+                <CustomText type="body-bold" style={{ color: locale === 'en' ? Colors.light.surface : theme.text.primary }}>{t('profile.lang_english')}</CustomText>
               </TouchableOpacity>
             </View>
           </View>
@@ -291,7 +336,7 @@ export default function ProfileScreen({ navigation }) {
 }
 
 /* ==========================================
-   Styles
+   Komponen Layar Styles
 ========================================== */
 const styles = StyleSheet.create({
   safeArea: {
@@ -417,11 +462,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    height: 52,
     borderRadius: 16,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: Colors.semantic.error.main,
+    shadowColor: Colors.semantic.error.main,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    marginTop: 8,
   },
-  /* ---------- BOTTOM SHEET STYLES ---------- */
+  /* ---------- Gaya Bottom Sheet ---------- */
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

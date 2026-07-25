@@ -1,5 +1,5 @@
 /* ==========================================
-   Layar Keranjang
+   Komponen Layar Layar Keranjang
 ========================================== */
 import React, { useState, useEffect } from 'react';
 import {
@@ -66,12 +66,12 @@ export default function CartScreen({ navigation }) {
               results.push(res.data || res.item);
             }
           } catch (e) {
-            console.log(`Failed to fetch cart item ${id}`, e);
+            void 0;
           }
         }
         setCartItems(results);
       } catch (err) {
-        console.log("Error loading cart items from backend:", err);
+        void 0;
       } finally {
         setFetchingCart(false);
       }
@@ -133,12 +133,7 @@ export default function CartScreen({ navigation }) {
       const res = await api.transaction.checkout(itemIds, meetingNote);
 
       if (res && parseInt(res.status) === 200) {
-        showToast(
-          locale === 'id' 
-            ? 'Pemesanan COD berhasil dibuat.' 
-            : 'COD booking has been successfully created.',
-          'success'
-        );
+        showToast(t('cart.success_toast'), 'success');
 
         // Remove these checked out items from Cart
         selectedItems.forEach(item => {
@@ -185,19 +180,23 @@ export default function CartScreen({ navigation }) {
           });
         }
 
+        // Trigger Local Pop-up Banner Notification
+        try {
+          const { triggerLocalNotification } = require('../utils/notificationHelper');
+          triggerLocalNotification(
+            t('cart.confirm_title') || 'Buat Janji COD',
+            t('cart.success_toast') || 'Pemesanan COD berhasil dibuat.'
+          );
+        } catch (e) {}
+
         // Navigate to Transaction History or Profile
         navigation.navigate('ProfileTab');
       } else {
-        showToast(res.message || (locale === 'id' ? 'Gagal memproses transaksi.' : 'Failed to process transaction.'), 'danger');
+        showToast(res.message || t('common.error'), 'danger');
       }
     } catch (err) {
-      console.log('Checkout error:', err);
-      showToast(
-        locale === 'id' 
-          ? 'Gagal terhubung ke server.' 
-          : 'Failed to connect to the server.', 
-        'danger'
-      );
+      void 0;
+      showToast(t('auth.server_error'), 'danger');
     } finally {
       setLoading(false);
     }
@@ -222,16 +221,19 @@ export default function CartScreen({ navigation }) {
             onPress={() => openCheckoutModal(sellerGroup)}
           >
             <CustomText style={styles.checkoutBtnText}>
-              {locale === 'id' ? 'Ajukan COD' : 'Arrange COD'}
+              {t('cart.checkout_btn')}
             </CustomText>
           </TouchableOpacity>
         </View>
 
         {/* Group Items */}
         {sellerGroup.items.map((cartItem) => {
-          const mainImg = cartItem.imageUris && cartItem.imageUris.length > 0 ? cartItem.imageUris[0] : null;
+          const mainImg = cartItem.imageUris && cartItem.imageUris.length > 0 
+            ? cartItem.imageUris[0] 
+            : (cartItem.image ? cartItem.image : null);
+          const isItemUnavailable = cartItem.status?.toLowerCase() !== 'available';
           return (
-            <View key={cartItem.idItem || cartItem.id} style={[styles.itemRow, { borderBottomColor: theme.border }]}>
+            <View key={cartItem.idItem || cartItem.id} style={[styles.itemRow, { borderBottomColor: theme.border, opacity: isItemUnavailable ? 0.6 : 1 }]}>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Detail', { id: cartItem.idItem || cartItem.id })}
@@ -251,13 +253,21 @@ export default function CartScreen({ navigation }) {
                   <CustomText style={[styles.itemTitle, { color: theme.text.primary }]} numberOfLines={1}>
                     {cartItem.title}
                   </CustomText>
-                  <CustomText style={[styles.itemCondition, { color: theme.text.secondary }]}>
-                    {cartItem.condition === 'Sangat Baik' ? (t('postitem.cond_vg') || 'Sangat Baik') :
-                     cartItem.condition === 'Baik' ? (t('postitem.cond_good') || 'Baik') :
-                     cartItem.condition === 'Kurang' ? (t('postitem.cond_poor') || 'Kurang') :
-                     cartItem.condition}
-                  </CustomText>
-                  <CustomText style={[styles.itemPrice, { color: Colors.primary.yellow500 }]}>
+                  {isItemUnavailable ? (
+                    <View style={{ backgroundColor: Colors.semantic.error.main + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginVertical: 2 }}>
+                      <CustomText style={{ color: Colors.semantic.error.main, fontSize: 10, fontFamily: 'Barlow-Bold' }}>
+                        {cartItem.status?.toLowerCase() === 'sold' ? (t('status.sold') || 'Terjual') : (t('status.booked') || 'Dipesan')}
+                      </CustomText>
+                    </View>
+                  ) : (
+                    <CustomText style={[styles.itemCondition, { color: theme.text.secondary }]}>
+                      {cartItem.condition === 'Sangat Baik' ? (t('postitem.cond_vg') || 'Sangat Baik') :
+                       cartItem.condition === 'Baik' ? (t('postitem.cond_good') || 'Baik') :
+                       cartItem.condition === 'Kurang' ? (t('postitem.cond_poor') || 'Kurang') :
+                       cartItem.condition}
+                    </CustomText>
+                  )}
+                  <CustomText style={[styles.itemPrice, { color: isItemUnavailable ? theme.text.placeholder : Colors.primary.yellow500 }]}>
                     {formatCurrency(cartItem.price)}
                   </CustomText>
                 </View>
@@ -277,7 +287,7 @@ export default function CartScreen({ navigation }) {
         {/* Total Summary Footer per Seller */}
         <View style={styles.sellerSummaryRow}>
           <CustomText style={{ color: theme.text.secondary, fontSize: 13 }}>
-            {locale === 'id' ? 'Total Harga:' : 'Total Price:'}
+            {t('cart.total') || 'Total:'}
           </CustomText>
           <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 15 }}>
             {formatCurrency(totalGroupPrice)}
@@ -290,14 +300,13 @@ export default function CartScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Screen Header */}
-      <Header title={locale === 'id' ? 'Keranjang Belanja' : 'Shopping Cart'} showBack={false} noBorder={true} />
+      <Header title={t('cart.title') || 'Keranjang Belanja'} showBack={false} noBorder={true} />
 
       {groupedList.length === 0 ? (
         <EmptyState
-          title={locale === 'id' ? 'Keranjang Belanja Kosong' : 'The Shopping Cart is Empty'}
-          description={locale === 'id' ? 'Silakan temukan berbagai produk pilihan pada halaman beranda dan tambahkan ke dalam keranjang belanja Anda.' : 'Please browse items on the home page and add them to your shopping cart.'}
+          title={t('cart.empty_title') || 'Keranjang Anda Kosong'}
+          description={t('cart.empty_desc') || 'Belum ada barang yang ditambahkan ke keranjang belanja Anda.'}
           icon="shopping-cart"
-          style={{ flex: 1, paddingBottom: 80 }}
         />
       ) : (
         <FlatList
@@ -333,7 +342,7 @@ export default function CartScreen({ navigation }) {
                 {/* Modal Header */}
                 <View style={styles.modalHeader}>
                   <CustomText style={[styles.modalTitle, { color: theme.text.primary }]}>
-                    {locale === 'id' ? 'Buat Janji COD' : 'Arrange COD Meeting'}
+                    {t('cart.confirm_title') || 'Buat Janji COD'}
                   </CustomText>
                   <TouchableOpacity 
                     onPress={() => setCheckoutModalVisible(false)}
@@ -345,7 +354,7 @@ export default function CartScreen({ navigation }) {
 
                 <ScrollView showsVerticalScrollIndicator={false}>
                 <CustomText style={[styles.modalSellerLabel, { color: theme.text.secondary }]}>
-                  {locale === 'id' ? `Membuat janji COD dengan penjual:` : `Arranging a COD meeting with:`}
+                  {t('cart.arrange_cod') || 'Membuat janji COD dengan penjual:'}
                 </CustomText>
                 <CustomText style={[styles.modalSellerName, { color: theme.text.primary }]}>
                   {selectedSellerName}
@@ -376,12 +385,12 @@ export default function CartScreen({ navigation }) {
 
                 {/* Meeting Notes Input */}
                 <CustomText style={[styles.inputLabel, { color: theme.text.primary }]}>
-                  {locale === 'id' ? 'Catatan Pertemuan COD (Tanggal & Tempat)' : 'COD Meeting Notes (Date & Location)'}
+                  {t('cart.note_label') || 'Catatan:'}
                 </CustomText>
                 <TextInput
                   value={meetingNote}
                   onChangeText={setMeetingNote}
-                  placeholder={locale === 'id' ? 'Contoh: Besok jam 12.00 di Kantin Astra' : 'Example: Tomorrow at 12:00 PM at Astra Canteen'}
+                  placeholder={t('cart.note_placeholder') || 'Tulis catatan di sini...'}
                   placeholderTextColor={theme.text.placeholder}
                   multiline={true}
                   numberOfLines={4}
@@ -405,7 +414,7 @@ export default function CartScreen({ navigation }) {
                     <>
                       <Ionicons name="logo-whatsapp" size={18} color={Colors.common.white} style={{ marginRight: 8 }} />
                       <CustomText style={styles.submitCheckoutBtnText}>
-                        {locale === 'id' ? 'Ajukan & Hubungi WA' : 'Arrange & Contact WA'}
+                        {t('cart.submit_cod') || 'Ajukan & Hubungi WA'}
                       </CustomText>
                     </>
                   )}
@@ -433,6 +442,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   listContent: {
+    flexGrow: 1,
     padding: 20,
     gap: 16,
   },
@@ -516,7 +526,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   
-  /* Modal Styles */
+  /* ---------- Modal Styles ---------- */
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

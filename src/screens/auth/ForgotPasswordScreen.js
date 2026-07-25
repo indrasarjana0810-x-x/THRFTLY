@@ -1,7 +1,7 @@
 /* ==========================================
-   ForgotPassword Screen Component
+   Komponen ForgotPassword Screen
 ========================================== */
-/* ---------- Imports ---------- */
+/* ---------- Impor ---------- */
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Animated,
   Keyboard,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Colors from "../../constants/colors";
@@ -33,13 +34,13 @@ import { useLanguage } from "../../localization/LanguageContext";
  * Halaman untuk memulihkan kata sandi pengguna.
  * Menggunakan sistem verifikasi kode OTP 6 digit.
  */
-export default function ForgotPasswordScreen({ onNavigateToLogin }) {
+export default function ForgotPasswordScreen({ navigation }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  /* ---------- Component States & Refs ---------- */
+  /* ---------- State & Ref Komponen ---------- */
   const [nim, setNim] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -51,7 +52,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
   const confirmPasswordRef = useRef(null);
   const scrollRef = useRef(null);
 
-  /* ---------- Animation Values ---------- */
+  /* ---------- Nilai Animasi ---------- */
   const step1X = useRef(new Animated.Value(0)).current;
   const step2X = useRef(new Animated.Value(500)).current;
   const step3X = useRef(new Animated.Value(500)).current;
@@ -59,13 +60,19 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
   const checkPop1 = useRef(new Animated.Value(1)).current;
   const checkPop2 = useRef(new Animated.Value(1)).current;
 
+  // Animasi Modal Sukses
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const bgScale = useRef(new Animated.Value(0)).current;
+  const shortArmWidth = useRef(new Animated.Value(0)).current;
+  const longArmHeight = useRef(new Animated.Value(0)).current;
+
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
 
   const styles = getStyles(theme, isDark);
 
-  /* ---------- Lifecycle & Effects ---------- */
+  /* ---------- Siklus Hidup & Efek ---------- */
   useEffect(() => {
     if (step === 1) {
       Animated.parallel([
@@ -109,7 +116,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     }
   }, [step]);
 
-  /* ---------- Keyboard Avoidance ---------- */
+  /* ---------- Penghindaran Keyboard ---------- */
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -129,7 +136,37 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     };
   }, [shiftAnim]);
 
-  /* ---------- Authentication Logic ---------- */
+  useEffect(() => {
+    if (successModalVisible) {
+      bgScale.setValue(0);
+      shortArmWidth.setValue(0);
+      longArmHeight.setValue(0);
+
+      Animated.parallel([
+        Animated.spring(bgScale, {
+          toValue: 1,
+          tension: 80,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(80),
+          Animated.timing(shortArmWidth, {
+            toValue: 24,
+            duration: 70,
+            useNativeDriver: false,
+          }),
+          Animated.timing(longArmHeight, {
+            toValue: 40,
+            duration: 110,
+            useNativeDriver: false,
+          })
+        ])
+      ]).start();
+    }
+  }, [successModalVisible, bgScale, shortArmWidth, longArmHeight]);
+
+  /* ---------- Logika Autentikasi ---------- */
   // Request OTP
   const handleRequestOtp = async () => {
     setErrors({});
@@ -142,15 +179,13 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     try {
       const data = await api.auth.forgotPassword(nim.trim());
       if (parseInt(data.status) === 200) {
-        const serverMsg = data.message;
-        showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_success') || "Kode OTP berhasil dikirim!", "success");
         setStep(2);
       } else {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.toast_email_not_found') || "Email/NIM tidak terdaftar", "danger");
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = "Gagal menghubungi server backend.";
       if (err.response && err.response.data) {
         errMsg = err.response.data.message || err.response.data.error || errMsg;
@@ -181,7 +216,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
         showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_verify_failed') || "Kode OTP salah", "danger");
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = "Gagal memverifikasi OTP.";
       if (err.response && err.response.data) {
         errMsg = err.response.data.message || err.response.data.error || errMsg;
@@ -216,15 +251,13 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
     try {
       const data = await api.auth.resetPassword(nim.trim(), otpCode.trim(), newPassword);
       if (parseInt(data.status) === 200) {
-        const serverMsg = data.message;
-        showToast(t(`api.${serverMsg}`) || t('auth.toast_password_updated') || "Kata sandi diperbarui!", "success");
-        onNavigateToLogin();
+        setSuccessModalVisible(true);
       } else {
         const serverMsg = data.message;
         showToast(t(`api.${serverMsg}`) || t('auth.toast_password_update_failed') || "Gagal mengatur ulang kata sandi", "danger");
       }
     } catch (err) {
-      console.log(err);
+      void 0;
       let errMsg = "Gagal memperbarui kata sandi.";
       if (err.response && err.response.data) {
         errMsg = err.response.data.message || err.response.data.error || errMsg;
@@ -311,7 +344,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     )}
                   </View>
                   <Text style={[styles.stepLabel, step === 1 ? styles.activeLabel : (step > 1 ? styles.completedLabel : styles.inactiveLabel)]}>
-                    Akun
+                    {t('auth.step_account') || "Akun"}
                   </Text>
                 </View>
  
@@ -335,7 +368,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     )}
                   </View>
                   <Text style={[styles.stepLabel, step === 2 ? styles.activeLabel : (step > 2 ? styles.completedLabel : styles.inactiveLabel)]}>
-                    OTP
+                    {t('auth.step_otp') || "OTP"}
                   </Text>
                 </View>
  
@@ -352,7 +385,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                     </Text>
                   </View>
                   <Text style={[styles.stepLabel, step === 3 ? styles.activeLabel : styles.inactiveLabel]}>
-                    Sandi
+                    {t('auth.step_password') || "Sandi"}
                   </Text>
                 </View>
               </View>
@@ -361,7 +394,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                 {/* ---------- STEP 1: Minta OTP ---------- */}
                 <Animated.View style={{ transform: [{ translateX: step1X }], width: "100%" }}>
                   <CustomInput
-                    label="NIM atau Email AstraTech"
+                    label={t('auth.nim_email_label') || "NIM atau Email AstraTech"}
                     placeholder={t('auth.nim_email_placeholder2') || 'Masukkan NIM / Email'}
                     value={nim}
                     onChangeText={(text) => {
@@ -390,7 +423,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                 <Animated.View style={{ transform: [{ translateX: step2X }], position: "absolute", top: 0, width: "100%" }}>
                   <CustomInput
                     ref={otpRef}
-                    label="Kode OTP (6 Digit)"
+                    label={t('auth.otp_label') || "Kode OTP (6 Digit)"}
                     placeholder={t('auth.otp_placeholder') || 'Masukkan 6 digit kode'}
                     value={otpCode}
                     onChangeText={(text) => {
@@ -428,7 +461,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                 <Animated.View style={{ transform: [{ translateX: step3X }], position: "absolute", top: 0, width: "100%" }}>
                   <CustomInput
                     ref={passwordRef}
-                    label="Kata Sandi Baru"
+                    label={t('auth.new_password_label') || "Kata Sandi Baru"}
                     placeholder={t('auth.password_min_placeholder') || 'Minimal 8 karakter'}
                     value={newPassword}
                     onChangeText={(text) => {
@@ -447,7 +480,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
                   />
                   <CustomInput
                     ref={confirmPasswordRef}
-                    label="Konfirmasi Kata Sandi"
+                    label={t('auth.confirm_password_label') || "Konfirmasi Kata Sandi"}
                     placeholder={t('auth.confirm_password_placeholder') || 'Ulangi kata sandi baru'}
                     value={confirmPassword}
                     onChangeText={(text) => {
@@ -476,7 +509,7 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
  
               <View style={styles.loginLinkWrapper}>
                 <Text style={styles.loginLabel}>{t('auth.remember_password') || 'Ingat kata sandi Anda?'}</Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={onNavigateToLogin}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Login')}>
                   <Text style={styles.loginLink}>{t('auth.login_now') || 'Masuk Sekarang'}</Text>
                 </TouchableOpacity>
               </View>
@@ -484,6 +517,45 @@ export default function ForgotPasswordScreen({ onNavigateToLogin }) {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Success Modal */}
+      <Modal
+        visible={successModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successIconWrapper}>
+              <Animated.View style={[styles.successIconBg, { transform: [{ scale: bgScale }] }]}>
+                {/* DRAW-ITSELF CHECKMARK */}
+                <View style={styles.drawCheckContainer}>
+                  {/* Lengan Pendek (Kiri bawah ke vertex) */}
+                  <Animated.View style={[styles.drawCheckShort, { width: shortArmWidth }]} />
+                  {/* Lengan Panjang (Vertex ke atas kanan) */}
+                  <Animated.View style={[styles.drawCheckLong, { height: longArmHeight }]} />
+                </View>
+              </Animated.View>
+            </View>
+            <CustomText type="h2" style={styles.successTitle}>
+              {t('auth.toast_password_updated') || "Sandi Diperbarui!"}
+            </CustomText>
+            <CustomText style={styles.successMessage}>
+              {t('auth.toast_password_updated_desc') || "Kata sandi Anda telah berhasil diubah. Silakan masuk dengan sandi baru Anda."}
+            </CustomText>
+            <CustomButton
+              title={t('auth.continue_login_btn') || "Lanjut ke Login"}
+              onPress={() => {
+                setSuccessModalVisible(false);
+                navigation.navigate('Login');
+              }}
+              type="primary"
+              style={styles.successButton}
+            />
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -717,5 +789,85 @@ const getStyles = (theme, isDark) => {
       fontSize: 14,
       color: Colors.primary.blue500,
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+      zIndex: 1000,
+    },
+    successModalContent: {
+      width: "100%",
+      backgroundColor: theme.surface,
+      borderRadius: 24,
+      padding: 32,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    successIconWrapper: {
+      marginBottom: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      height: 80,
+    },
+    successIconBg: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: Colors.semantic.success.main,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: Colors.semantic.success.main,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    drawCheckContainer: {
+      width: 24,
+      height: 40,
+      transform: [{ rotate: "45deg" }],
+      marginTop: -5,
+      marginLeft: -5,
+    },
+    drawCheckShort: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      height: 5,
+      backgroundColor: Colors.light.surface,
+      borderRadius: 3,
+    },
+    drawCheckLong: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 5,
+      backgroundColor: Colors.light.surface,
+      borderRadius: 3,
+    },
+    successTitle: {
+      fontFamily: "Barlow-Bold",
+      fontSize: 22,
+      color: theme.text.primary,
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    successMessage: {
+      fontFamily: "Barlow-Medium",
+      fontSize: 14,
+      color: theme.text.secondary,
+      textAlign: "center",
+      marginBottom: 32,
+      lineHeight: 22,
+    },
+    successButton: {
+      width: "100%",
+    }
   });
 };

@@ -1,5 +1,5 @@
 /* ==========================================
-   Product Card
+   Komponen Layar Product Card
 ========================================== */
 import React, { useRef } from 'react';
 import {
@@ -229,7 +229,14 @@ export default function ProductCard({
             })}
 
             <TouchableOpacity
-              style={cardStyles.heartCircle}
+              style={[
+                cardStyles.heartCircle,
+                isItemFavorited && {
+                  backgroundColor: isDark ? 'rgba(255, 214, 0, 0.2)' : '#FEF3C7',
+                  borderWidth: 1,
+                  borderColor: isDark ? Colors.primary.yellow500 : '#F59E0B',
+                }
+              ]}
               onPress={handleFavoritePress}
               activeOpacity={0.8}
             >
@@ -237,7 +244,7 @@ export default function ProductCard({
                 <Ionicons
                   name={isItemFavorited ? "cart" : "cart-outline"}
                   size={16}
-                  color={isItemFavorited ? Colors.primary.yellow500 : theme.text.placeholder}
+                  color={isItemFavorited ? (isDark ? Colors.primary.yellow500 : '#B45309') : theme.text.placeholder}
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -272,9 +279,7 @@ export default function ProductCard({
       )}
 
       {isList ? (
-        // =====================================
-        // LIST LAYOUT (Horizontal)
-        // =====================================
+        /* ---------- LIST LAYOUT (Horizontal) ---------- */
         <BlurView
           intensity={isDark ? 30 : 60}
           tint={isDark ? 'dark' : 'light'}
@@ -355,9 +360,7 @@ export default function ProductCard({
           </View>
         </BlurView>
       ) : (
-        // =====================================
-        // GRID / MASONRY / POPULAR LAYOUT (Vertical)
-        // =====================================
+        /* ---------- GRID / MASONRY / POPULAR LAYOUT (Vertical) ---------- */
         <BlurView
           intensity={isDark ? 40 : 80}
           tint={isDark ? 'dark' : 'light'}
@@ -390,7 +393,7 @@ export default function ProductCard({
   );
 }
 
-/* Styles */
+/* ---------- Gaya ---------- */
 
 const getStyles = (theme, isDark) => {
   const shadowColor = Colors.primary.blue500;
