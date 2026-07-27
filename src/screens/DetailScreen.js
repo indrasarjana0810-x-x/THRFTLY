@@ -113,7 +113,7 @@ export default function DetailScreen({ route, navigation }) {
   const user = useSelector(selectAuthUser);
   const dispatch = useDispatch();
   const cartItems = useSelector(selectCartItems) || [];
-  const isFavorite = cartItems.includes(id);
+  const isInCart = cartItems.includes(id);
 
   /* ---------- Scroll Animations ---------- */
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -153,9 +153,9 @@ export default function DetailScreen({ route, navigation }) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isDeleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
-  /* ---------- Bookmark Particle Animation (sama seperti ProductCard) ---------- */
-  const bookmarkScaleAnim = useRef(new Animated.Value(1)).current;
-  const bookmarkParticleAnim = useRef(new Animated.Value(0)).current;
+  /* ---------- Cart Particle Animation (sama seperti ProductCard) ---------- */
+  const cartScaleAnim = useRef(new Animated.Value(1)).current;
+  const cartParticleAnim = useRef(new Animated.Value(0)).current;
 
   /* ---------- Checksheet Sublist Animation ---------- */
   const [showAllChecksheet, setShowAllChecksheet] = useState(false);
@@ -190,7 +190,7 @@ export default function DetailScreen({ route, navigation }) {
     outputRange: [0, 1],
   });
 
-  const handleToggleFavorite = () => {
+  const handleToggleCart = () => {
     if (!user) {
       showToast(
         t('detail.login_to_save'),
@@ -199,25 +199,25 @@ export default function DetailScreen({ route, navigation }) {
       return;
     }
 
-    const nextFavorite = !isFavorite;
+    const nextFavorite = !isInCart;
     dispatch(toggleCartOptimistic(id));
     dispatch(toggleCartApi(id));
 
     if (nextFavorite) {
-      // Tambah bookmark: pantul + partikel meledak
-      bookmarkParticleAnim.setValue(0);
+      // Tambah ke keranjang: pantul + partikel meledak
+      cartParticleAnim.setValue(0);
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(bookmarkScaleAnim, { toValue: 1.4, duration: 100, useNativeDriver: true }),
-          Animated.spring(bookmarkScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+          Animated.timing(cartScaleAnim, { toValue: 1.4, duration: 100, useNativeDriver: true }),
+          Animated.spring(cartScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
         ]),
-        Animated.timing(bookmarkParticleAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(cartParticleAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
       ]).start();
     } else {
-      // Hapus bookmark: mantul mengecil
+      // Hapus dari keranjang: mantul mengecil
       Animated.sequence([
-        Animated.timing(bookmarkScaleAnim, { toValue: 0.8, duration: 100, useNativeDriver: true }),
-        Animated.spring(bookmarkScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+        Animated.timing(cartScaleAnim, { toValue: 0.8, duration: 100, useNativeDriver: true }),
+        Animated.spring(cartScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
       ]).start();
     }
   };
@@ -386,10 +386,7 @@ export default function DetailScreen({ route, navigation }) {
       const res = await api.transaction.checkout([itemId], finalNote);
 
       if (res && (parseInt(res.status) === 200 || parseInt(res.status) === 201)) {
-        showToast(
-          t('cart.success_toast') || 'Pemesanan COD berhasil dibuat!',
-          'success'
-        );
+        // Toast removed as WhatsApp opens immediately
 
         // Update local item status to Booked
         setItem(prev => prev ? { ...prev, status: 'Booked' } : prev);
@@ -973,18 +970,18 @@ export default function DetailScreen({ route, navigation }) {
           </View>
         ) : (
           <View style={{ flex: 1, flexDirection: 'row', gap: 10 }}>
-            {/* Bookmark button on the left */}
+            {/* Cart button on the left */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={handleToggleFavorite}
+              onPress={handleToggleCart}
               style={[
                 styles.iconActionBtn, 
                 { 
-                  backgroundColor: isFavorite 
+                  backgroundColor: isInCart 
                     ? (isDark ? 'rgba(255, 214, 0, 0.2)' : '#FEF3C7') 
                     : (isDark ? Colors.dark.surface : Colors.light.border),
-                  borderColor: isFavorite ? (isDark ? Colors.primary.yellow500 : '#F59E0B') : 'transparent',
-                  borderWidth: isFavorite ? 1.5 : 0
+                  borderColor: isInCart ? (isDark ? Colors.primary.yellow500 : '#F59E0B') : 'transparent',
+                  borderWidth: isInCart ? 1.5 : 0
                 }
               ]}
             >
@@ -993,19 +990,19 @@ export default function DetailScreen({ route, navigation }) {
                 const angle = (i * 360) / 6;
                 const rad = (angle * Math.PI) / 180;
                 const distance = 20;
-                const translateX = bookmarkParticleAnim.interpolate({
+                const translateX = cartParticleAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, Math.cos(rad) * distance],
                 });
-                const translateY = bookmarkParticleAnim.interpolate({
+                const translateY = cartParticleAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, Math.sin(rad) * distance],
                 });
-                const opacity = bookmarkParticleAnim.interpolate({
+                const opacity = cartParticleAnim.interpolate({
                   inputRange: [0, 0.1, 0.8, 1],
                   outputRange: [0, 1, 1, 0],
                 });
-                const scale = bookmarkParticleAnim.interpolate({
+                const scale = cartParticleAnim.interpolate({
                   inputRange: [0, 0.5, 1],
                   outputRange: [0, 1, 0],
                 });
@@ -1029,11 +1026,11 @@ export default function DetailScreen({ route, navigation }) {
               })}
 
               {/* Cart Icon */}
-              <Animated.View style={{ transform: [{ scale: bookmarkScaleAnim }] }}>
+              <Animated.View style={{ transform: [{ scale: cartScaleAnim }] }}>
                 <Ionicons
-                  name={isFavorite ? 'cart' : 'cart-outline'}
+                  name={isInCart ? 'cart' : 'cart-outline'}
                   size={22}
-                  color={isFavorite ? (isDark ? Colors.primary.yellow500 : '#B45309') : theme.text.secondary}
+                  color={isInCart ? (isDark ? Colors.primary.yellow500 : '#B45309') : theme.text.secondary}
                 />
               </Animated.View>
             </TouchableOpacity>

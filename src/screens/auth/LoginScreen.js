@@ -147,15 +147,21 @@ export default function LoginScreen({ navigation }) {
         dispatch(setCredentials({ token: data.data, user: userProfile }));
       } else {
         const serverMsg = data.message;
-        const translatedMsg = t(`api.${serverMsg}`) || t('auth.login_failed_credential') || "Gagal masuk. Pastikan kredensial (NIM/Email dan Kata Sandi) Anda benar.";
-        showToast(translatedMsg, "danger");
+        const localizedMsg = serverMsg ? t(`api.${serverMsg}`) : null;
+        const displayMsg = (localizedMsg && localizedMsg !== `api.${serverMsg}`) 
+          ? localizedMsg 
+          : (serverMsg || t('auth.login_failed_credential') || "NIM/Email atau Password salah!");
+        showToast(displayMsg, "danger");
       }
     } catch (err) {
       void 0;
       let errMsg = t('auth.server_error') || "Gagal terhubung ke server Spring Boot Anda.";
       if (err.response && err.response.data) {
         let rawCode = err.response.data.message || err.response.data.error;
-        errMsg = t(`api.${rawCode}`) || rawCode || errMsg;
+        if (rawCode) {
+          const localized = t(`api.${rawCode}`);
+          errMsg = (localized && localized !== `api.${rawCode}`) ? localized : rawCode;
+        }
       }
       showToast(errMsg, "danger");
     } finally {

@@ -116,10 +116,25 @@ export default function CartScreen({ navigation }) {
   };
 
   const openCheckoutModal = (sellerGroup) => {
+    const availableItems = sellerGroup.items.filter(i => {
+      const s = (i.status || '').toLowerCase();
+      return s === '' || s === 'available' || s === 'tersedia';
+    });
+
+    if (availableItems.length === 0) {
+      showToast(
+        locale === 'id' 
+          ? 'Semua barang dari penjual ini sudah dipesan/terjual oleh pembeli lain.' 
+          : 'All items from this seller have been booked/sold by another buyer.', 
+        'warning'
+      );
+      return;
+    }
+
     setSelectedSellerId(sellerGroup.sellerId);
     setSelectedSellerName(sellerGroup.sellerName);
     setSelectedSellerPhone(sellerGroup.sellerPhone);
-    setSelectedItems(sellerGroup.items);
+    setSelectedItems(availableItems);
     setMeetingNote('');
     setCheckoutModalVisible(true);
   };
@@ -180,15 +195,6 @@ export default function CartScreen({ navigation }) {
           });
         }
 
-        // Trigger Local Pop-up Banner Notification
-        try {
-          const { triggerLocalNotification } = require('../utils/notificationHelper');
-          triggerLocalNotification(
-            t('cart.confirm_title') || 'Buat Janji COD',
-            t('cart.success_toast') || 'Pemesanan COD berhasil dibuat.'
-          );
-        } catch (e) {}
-
         // Navigate to Transaction History or Profile
         navigation.navigate('ProfileTab');
       } else {
@@ -204,6 +210,12 @@ export default function CartScreen({ navigation }) {
 
   const renderSellerGroup = ({ item: sellerGroup }) => {
     const totalGroupPrice = sellerGroup.items.reduce((sum, i) => sum + Number(i.price), 0);
+    const availableItems = sellerGroup.items.filter(i => {
+      const s = (i.status || '').toLowerCase();
+      return s === '' || s === 'available' || s === 'tersedia';
+    });
+    const hasAvailable = availableItems.length > 0;
+    const totalAvailablePrice = availableItems.reduce((sum, i) => sum + Number(i.price), 0);
 
     return (
       <View style={[styles.sellerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -216,12 +228,16 @@ export default function CartScreen({ navigation }) {
             </CustomText>
           </View>
           <TouchableOpacity 
+            disabled={!hasAvailable}
             activeOpacity={0.7}
-            style={[styles.checkoutBtn, { backgroundColor: Colors.primary.blue500 }]}
+            style={[
+              styles.checkoutBtn, 
+              { backgroundColor: !hasAvailable ? (isDark ? Colors.dark.border : '#E0E0E0') : Colors.primary.blue500 }
+            ]}
             onPress={() => openCheckoutModal(sellerGroup)}
           >
-            <CustomText style={styles.checkoutBtnText}>
-              {t('cart.checkout_btn')}
+            <CustomText style={[styles.checkoutBtnText, { color: !hasAvailable ? theme.text.placeholder : Colors.common.white }]}>
+              {!hasAvailable ? (t('cart.item_unavailable_btn') || 'Sudah Dipesan') : t('cart.checkout_btn')}
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -231,7 +247,8 @@ export default function CartScreen({ navigation }) {
           const mainImg = cartItem.imageUris && cartItem.imageUris.length > 0 
             ? cartItem.imageUris[0] 
             : (cartItem.image ? cartItem.image : null);
-          const isItemUnavailable = cartItem.status?.toLowerCase() !== 'available';
+          const statusLower = (cartItem.status || '').toLowerCase();
+          const isItemUnavailable = statusLower !== '' && statusLower !== 'available' && statusLower !== 'tersedia';
           return (
             <View key={cartItem.idItem || cartItem.id} style={[styles.itemRow, { borderBottomColor: theme.border, opacity: isItemUnavailable ? 0.6 : 1 }]}>
               <TouchableOpacity
@@ -375,7 +392,7 @@ export default function CartScreen({ navigation }) {
                   <View style={[styles.modalDivider, { backgroundColor: theme.border }]} />
                   <View style={styles.modalItemSummaryRow}>
                     <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 14 }}>
-                      Total:
+                      {t('cart.total') || 'Total:'}
                     </CustomText>
                     <CustomText style={{ color: Colors.primary.yellow500, fontFamily: 'Barlow-Bold', fontSize: 15 }}>
                       {formatCurrency(selectedItems.reduce((sum, i) => sum + Number(i.price), 0))}

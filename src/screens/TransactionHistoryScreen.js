@@ -142,7 +142,7 @@ export default function TransactionHistoryScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchTransactions(false, false);
-    }, [])
+    }, [fetchTransactions])
   );
 
   const handleRefresh = useCallback(() => {
@@ -153,26 +153,7 @@ export default function TransactionHistoryScreen({ navigation }) {
     try {
       const res = await api.transaction.updateStatus(transId, newStatus);
       if (res && parseInt(res.status) === 200) {
-        fetchTransactions(true);
-        try {
-          const { triggerLocalNotification } = require('../utils/notificationHelper');
-          let notifTitle = t('history.notif_update_title') || 'Update Transaksi';
-          let notifMsg = t('history.notif_update_msg') || 'Status transaksi berhasil diperbarui.';
-          if (newStatus === 'Accepted') {
-            notifTitle = t('history.notif_accepted_title') || 'Pesanan Diterima';
-            notifMsg = t('history.notif_accepted_msg') || 'Anda telah menerima pesanan COD ini.';
-          } else if (newStatus === 'Rejected') {
-            notifTitle = t('history.notif_rejected_title') || 'Pesanan Ditolak';
-            notifMsg = t('history.notif_rejected_msg') || 'Anda telah menolak pesanan COD ini.';
-          } else if (newStatus === 'Cancelled') {
-            notifTitle = t('history.notif_cancelled_title') || 'Pesanan Dibatalkan';
-            notifMsg = t('history.notif_cancelled_msg') || 'Pesanan COD telah dibatalkan.';
-          } else if (newStatus === 'Completed') {
-            notifTitle = t('history.notif_completed_title') || 'Transaksi Selesai';
-            notifMsg = t('history.notif_completed_msg') || 'Transaksi COD telah dinyatakan selesai.';
-          }
-          triggerLocalNotification(notifTitle, notifMsg);
-        } catch (e) {}
+        fetchTransactions(false, false);
       } else {
         showToast(res.message || t('history.update_fail') || 'Gagal memperbarui transaksi', 'danger');
       }
@@ -268,52 +249,61 @@ export default function TransactionHistoryScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Card Body: Items list */}
-        <View style={[styles.itemsContainer, { 
-          borderColor: theme.border, 
-          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)' 
-        }]}>
-          {item.details.map((detail, idx) => {
-            const mainImg = detail.item?.imageUris && detail.item.imageUris.length > 0 
-              ? detail.item.imageUris[0] 
-              : (detail.item?.image ? detail.item.image : null);
+        {/* Card Body: Item Summary (Klik kartu untuk melihat Detail Transaksi) */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('TransactionDetail', { transaction: item, role: activeTab })}
+          style={[styles.itemsContainer, { 
+            borderColor: theme.border, 
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+            padding: 12,
+            borderRadius: 12,
+            marginHorizontal: 16,
+            marginBottom: 12
+          }]}
+        >
+          {(() => {
+            const firstDetail = item.details && item.details.length > 0 ? item.details[0] : null;
+            const mainImg = firstDetail?.item?.imageUris && firstDetail.item.imageUris.length > 0 
+              ? firstDetail.item.imageUris[0] 
+              : (firstDetail?.item?.image ? firstDetail.item.image : null);
+            const extraCount = item.details ? item.details.length - 1 : 0;
+
             return (
-              <View key={idx} style={[styles.itemRow, idx === item.details.length - 1 && { borderBottomWidth: 0 }]}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('TransactionDetail', { transaction: item, role: activeTab })}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
-                >
-                  {mainImg ? (
-                    <View style={styles.itemImgWrapper}>
-                      <Image source={{ uri: mainImg }} style={styles.itemImg} contentFit="cover" cachePolicy="memory-disk" />
-                    </View>
-                  ) : (
-                    <View style={[styles.itemPlaceholderImg, { backgroundColor: isDark ? Colors.dark.surface : Colors.light.border }]}>
-                      <Ionicons name="pricetag-outline" size={20} color={theme.text.secondary} />
-                    </View>
-                  )}
-                  <View style={styles.itemDetails}>
-                    <CustomText style={[styles.itemTitle, { color: theme.text.primary }]} numberOfLines={1}>
-                      {detail.item?.title || 'Barang Thrift'}
-                    </CustomText>
-                    {detail.item?.condition && (
-                      <CustomText style={[styles.itemCondition, { color: theme.text.secondary }]}>
-                        {detail.item.condition === 'Sangat Baik' ? (t('postitem.cond_vg') || 'Sangat Baik') :
-                         detail.item.condition === 'Baik' ? (t('postitem.cond_good') || 'Baik') :
-                         detail.item.condition === 'Kurang' ? (t('postitem.cond_poor') || 'Kurang') :
-                         detail.item.condition}
-                      </CustomText>
-                    )}
-                    <CustomText style={[styles.itemPrice, { color: Colors.primary.yellow500 }]}>
-                      {formatCurrency(detail.priceDet)}
-                    </CustomText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {mainImg ? (
+                  <View style={styles.itemImgWrapper}>
+                    <Image source={{ uri: mainImg }} style={styles.itemImg} contentFit="cover" cachePolicy="memory-disk" />
                   </View>
-                </TouchableOpacity>
+                ) : (
+                  <View style={[styles.itemPlaceholderImg, { backgroundColor: isDark ? Colors.dark.surface : Colors.light.border }]}>
+                    <Ionicons name="pricetag-outline" size={20} color={theme.text.secondary} />
+                  </View>
+                )}
+                <View style={[styles.itemDetails, { flex: 1 }]}>
+                  <CustomText style={[styles.itemTitle, { color: theme.text.primary }]} numberOfLines={1}>
+                    {firstDetail?.item?.title || 'Barang Thrift'}
+                  </CustomText>
+                  {extraCount > 0 ? (
+                    <CustomText style={{ color: theme.text.secondary, fontSize: 12, marginTop: 2 }}>
+                      +{extraCount} barang lainnya
+                    </CustomText>
+                  ) : (
+                    firstDetail?.item?.condition && (
+                      <CustomText style={[styles.itemCondition, { color: theme.text.secondary }]}>
+                        {firstDetail.item.condition === 'Sangat Baik' ? (t('postitem.cond_vg') || 'Sangat Baik') :
+                         firstDetail.item.condition === 'Baik' ? (t('postitem.cond_good') || 'Baik') :
+                         firstDetail.item.condition === 'Kurang' ? (t('postitem.cond_poor') || 'Kurang') :
+                         firstDetail.item.condition}
+                      </CustomText>
+                    )
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.text.secondary} />
               </View>
             );
-          })}
-        </View>
+          })()}
+        </TouchableOpacity>
 
         {/* Meeting Note / Note Janjian */}
         {item.meetingNote && (

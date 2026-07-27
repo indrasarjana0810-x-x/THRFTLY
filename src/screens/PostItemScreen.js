@@ -16,6 +16,7 @@ import {
   Easing,
   StatusBar,
   Dimensions,
+  Linking,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -405,6 +406,8 @@ export default function PostItemScreen({ navigation, route }) {
   const [longitude, setLongitude] = useState(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isImageModalVisible, setImageModalVisible] = useState(false);
+  const [cameraPermDeniedVisible, setCameraPermDeniedVisible] = useState(false);
+  const [galleryPermDeniedVisible, setGalleryPermDeniedVisible] = useState(false);
   const [isLocationPermAlertVisible, setLocationPermAlertVisible] = useState(false);
   const [spotModalVisible, setSpotModalVisible] = useState(false);
   const [selectedSpotName, setSelectedSpotName] = useState('');
@@ -454,9 +457,17 @@ export default function PostItemScreen({ navigation, route }) {
     try {
       let result;
       if (source === 'kamera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          showToast('Izin kamera diperlukan.', 'warning');
+        // Cek status izin kamera SEBELUM request agar system dialog tidak muncul jika sudah pernah ditentukan
+        const { status: currentStatus } = await ImagePicker.getCameraPermissionsAsync();
+        let finalStatus = currentStatus;
+        if (currentStatus === 'undetermined') {
+          // Belum pernah diminta → trigger system dialog 1x (wajar)
+          const { status: requested } = await ImagePicker.requestCameraPermissionsAsync();
+          finalStatus = requested;
+        }
+        if (finalStatus === 'denied' || finalStatus !== 'granted') {
+          // Sudah ditolak → arahkan ke Settings lewat custom modal, TIDAK trigger system dialog lagi
+          showCameraPermDeniedAlert();
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -465,9 +476,15 @@ export default function PostItemScreen({ navigation, route }) {
           quality: 0.7,
         });
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          showToast('Izin galeri diperlukan.', 'warning');
+        // Cek status izin galeri SEBELUM request
+        const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
+        let finalStatus = currentStatus;
+        if (currentStatus === 'undetermined') {
+          const { status: requested } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          finalStatus = requested;
+        }
+        if (finalStatus === 'denied' || finalStatus !== 'granted') {
+          showGalleryPermDeniedAlert();
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -485,6 +502,14 @@ export default function PostItemScreen({ navigation, route }) {
       void 0;
       showToast('Gagal memproses gambar.', 'danger');
     }
+  };
+
+  const showCameraPermDeniedAlert = () => {
+    setCameraPermDeniedVisible(true);
+  };
+
+  const showGalleryPermDeniedAlert = () => {
+    setGalleryPermDeniedVisible(true);
   };
 
   const handleRemoveImage = (indexToRemove) => {
@@ -1289,6 +1314,40 @@ export default function PostItemScreen({ navigation, route }) {
           executeImagePick('galeri');
         }}
         onClose={() => setImageModalVisible(false)}
+      />
+
+      {/* ---------- Modal Izin Kamera Ditolak ---------- */}
+      <CustomAlert
+        visible={cameraPermDeniedVisible}
+        type="warning"
+        title="Izin Kamera Diperlukan"
+        message="Kamu telah menolak izin kamera. Buka Pengaturan untuk mengaktifkannya secara manual."
+        showCancel
+        confirmText="Buka Pengaturan"
+        cancelText="Batal"
+        onConfirm={() => {
+          setCameraPermDeniedVisible(false);
+          Linking.openSettings();
+        }}
+        onCancel={() => setCameraPermDeniedVisible(false)}
+        onClose={() => setCameraPermDeniedVisible(false)}
+      />
+
+      {/* ---------- Modal Izin Galeri Ditolak ---------- */}
+      <CustomAlert
+        visible={galleryPermDeniedVisible}
+        type="warning"
+        title="Izin Galeri Diperlukan"
+        message="Kamu telah menolak izin galeri. Buka Pengaturan untuk mengaktifkannya secara manual."
+        showCancel
+        confirmText="Buka Pengaturan"
+        cancelText="Batal"
+        onConfirm={() => {
+          setGalleryPermDeniedVisible(false);
+          Linking.openSettings();
+        }}
+        onCancel={() => setGalleryPermDeniedVisible(false)}
+        onClose={() => setGalleryPermDeniedVisible(false)}
       />
 
       {/* ---------- Modal Izin Lokasi ---------- */}

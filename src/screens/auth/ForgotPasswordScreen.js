@@ -181,14 +181,17 @@ export default function ForgotPasswordScreen({ navigation }) {
       if (parseInt(data.status) === 200) {
         setStep(2);
       } else {
-        const serverMsg = data.message;
-        showToast(t(`api.${serverMsg}`) || t('auth.toast_email_not_found') || "Email/NIM tidak terdaftar", "danger");
+        showToast(t('auth.toast_email_not_found') || "NIM atau Email tidak terdaftar!", "danger");
       }
     } catch (err) {
       void 0;
-      let errMsg = "Gagal menghubungi server backend.";
-      if (err.response && err.response.data) {
-        errMsg = err.response.data.message || err.response.data.error || errMsg;
+      let errMsg = t('auth.toast_email_not_found') || "NIM atau Email tidak terdaftar!";
+      if (err.response && err.response.data && err.response.data.message) {
+        let rawCode = err.response.data.message;
+        const localized = t(`api.${rawCode}`);
+        if (localized && localized !== `api.${rawCode}`) {
+          errMsg = localized;
+        }
       }
       showToast(errMsg, "danger");
     } finally {
@@ -208,18 +211,20 @@ export default function ForgotPasswordScreen({ navigation }) {
     try {
       const data = await api.auth.verifyOtp(nim.trim(), otpCode.trim());
       if (parseInt(data.status) === 200) {
-        const serverMsg = data.message;
-        showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_verify_success') || "Verifikasi OTP sukses!", "success");
+        showToast(t('auth.toast_otp_verify_success') || "Verifikasi OTP sukses!", "success");
         setStep(3);
       } else {
-        const serverMsg = data.message;
-        showToast(t(`api.${serverMsg}`) || t('auth.toast_otp_verify_failed') || "Kode OTP salah", "danger");
+        showToast(t('auth.toast_otp_verify_failed') || "Kode OTP salah atau kedaluwarsa!", "danger");
       }
     } catch (err) {
       void 0;
-      let errMsg = "Gagal memverifikasi OTP.";
-      if (err.response && err.response.data) {
-        errMsg = err.response.data.message || err.response.data.error || errMsg;
+      let errMsg = t('auth.toast_otp_verify_failed') || "Kode OTP salah atau kedaluwarsa!";
+      if (err.response && err.response.data && err.response.data.message) {
+        let rawCode = err.response.data.message;
+        const localized = t(`api.${rawCode}`);
+        if (localized && localized !== `api.${rawCode}`) {
+          errMsg = localized;
+        }
       }
       showToast(errMsg, "danger");
     } finally {
