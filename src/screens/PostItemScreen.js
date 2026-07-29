@@ -47,7 +47,7 @@ const BASE_CAMPUS_SPOTS = [
   { id: 'spot1', nameId: 'Lobi Utama Gedung A (Rektorat)', nameEn: 'Main Lobby Building A (Rectorate)', lat: -6.348360, lng: 107.148073 },
   { id: 'spot2', nameId: 'Gedung B (Area Perkuliahan)', nameEn: 'Building B (Lecture Area)', lat: -6.348000, lng: 107.148600 },
   { id: 'spot3', nameId: 'Kantin Utama Kampus Astra', nameEn: 'Main Canteen Astra Campus', lat: -6.348800, lng: 107.149200 },
-  { id: 'spot4', nameId: 'Perpustakaan Lt. 2', nameEn: 'Library 2nd Floor', lat: -6.348200, lng: 107.149500 },
+  { id: 'spot4', nameId: 'Perpustakaan Lt. 2', nameEn: 'Library 2nd Floor', lat: -6.348600, lng: 107.149500 },
   { id: 'spot5', nameId: 'Parkiran Utama Kampus', nameEn: 'Main Campus Parking Area', lat: -6.349100, lng: 107.150100 },
   { id: 'spot6', nameId: 'Hall & Lapangan Olahraga', nameEn: 'Hall & Sports Field', lat: -6.349500, lng: 107.150600 },
 ];
@@ -412,6 +412,7 @@ export default function PostItemScreen({ navigation, route }) {
   const [isGalleryPermReqAlertVisible, setGalleryPermReqAlertVisible] = useState(false);
   const [isLocationPermAlertVisible, setLocationPermAlertVisible] = useState(false);
   const [spotModalVisible, setSpotModalVisible] = useState(false);
+  const [selectedSpotName, setSelectedSpotName] = useState('');
   const campusPresetSpots = useMemo(() => {
     const spots = BASE_CAMPUS_SPOTS.map(s => ({
       id: s.id,
