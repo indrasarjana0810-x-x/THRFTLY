@@ -17,6 +17,8 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   async (config) => {
     try {
+      const lang = (await AsyncStorage.getItem('appLanguage')) || 'id';
+      config.headers['Accept-Language'] = lang;
       const token = await AsyncStorage.getItem('userToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;

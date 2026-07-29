@@ -2,7 +2,7 @@
    Komponen Layar Profile
 ========================================== */
 /* ---------- Impor ---------- */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -83,9 +83,9 @@ export default function ProfileScreen({ navigation }) {
   const { t, locale, switchLanguage } = useLanguage();
   const [langModalVisible, setLangModalVisible] = useState(false);
   
-  // Animasi Language Modal
-  const langSlideAnim = React.useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  const langFadeAnim = React.useRef(new Animated.Value(0)).current;
+  // Animasi Language Modal (useRef standar sesuai W4 Slide 83)
+  const langSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const langFadeAnim = useRef(new Animated.Value(0)).current;
 
   const openLangModal = () => {
     setLangModalVisible(true);
@@ -118,7 +118,8 @@ export default function ProfileScreen({ navigation }) {
     ]).start(() => setLangModalVisible(false));
   };
 
-  const MENU_SECTIONS = [
+  // MENU_SECTIONS dimemoisasi menggunakan useMemo sesuai W4 Slide 93
+  const MENU_SECTIONS = useMemo(() => [
     {
       title: t('profile.account') || 'Akun',
       data: [
@@ -134,7 +135,7 @@ export default function ProfileScreen({ navigation }) {
         { id: 'notification', title: t('profile.menu_notification'), desc: t('profile.desc_notification'), icon: 'notifications-outline', color: Colors.semantic.info.main, type: 'toggle' },
       ]
     }
-  ];
+  ], [t, locale]);
 
   /* ---------- Fungsi Penanganan ---------- */
   const handleMenuPress = (menu) => {

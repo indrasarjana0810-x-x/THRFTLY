@@ -157,7 +157,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
                           </CustomText>
                         )}
                         <CustomText style={[styles.itemPrice, { color: Colors.primary.yellow500 }]}>
-                          {formatCurrency(detail.priceDet)}
+                          {formatCurrency(detail.priceDet, locale)}
                         </CustomText>
                       </View>
                     </TouchableOpacity>
@@ -193,7 +193,7 @@ export default function TransactionDetailScreen({ route, navigation }) {
               {t('history.total_label') || 'Total:'}
             </CustomText>
             <CustomText style={[styles.totalPrice, { color: theme.text.primary, fontSize: 16 }]}>
-              {formatCurrency(transaction.totalTrx)}
+              {formatCurrency(transaction.totalTrx, locale)}
             </CustomText>
           </View>
 

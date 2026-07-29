@@ -1,7 +1,7 @@
 /* ==========================================
    Transaction History Screen — Buyer & Seller Tabbed View
    ========================================== */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Linking,
   ActivityIndicator,
+  LayoutAnimation,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -37,6 +38,11 @@ export default function TransactionHistoryScreen({ navigation }) {
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState('buyer'); // buyer | seller
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
   const [buyerTrans, setBuyerTrans] = useState([]);
   const [sellerTrans, setSellerTrans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,9 +77,14 @@ export default function TransactionHistoryScreen({ navigation }) {
     setAlertVisible(true);
   };
 
+  const handleTabChange = useCallback((tab) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setActiveTab(tab);
+  }, []);
+
   const fetchTransactions = useCallback(async (isLoadMore = false, isRefreshing = false) => {
     if (isLoadMore) {
-      const isBuyer = activeTab === 'buyer';
+      const isBuyer = activeTabRef.current === 'buyer';
       const loadingMore = isBuyer ? buyerLoadingMore : sellerLoadingMore;
       const page = isBuyer ? buyerPage : sellerPage;
       const totalPages = isBuyer ? buyerTotalPages : sellerTotalPages;
@@ -137,11 +148,33 @@ export default function TransactionHistoryScreen({ navigation }) {
         setRefreshing(false);
       }
     }
-  }, [activeTab, buyerLoadingMore, sellerLoadingMore, buyerPage, sellerPage, buyerTotalPages, sellerTotalPages]);
+  }, [buyerLoadingMore, sellerLoadingMore, buyerPage, sellerPage, buyerTotalPages, sellerTotalPages, showToast, t]);
 
   useFocusEffect(
     useCallback(() => {
+      // Load pertama saat layar fokus
       fetchTransactions(false, false);
+
+      // Realtime polling setiap 4 detik saat layar sedang dibuka agar pesanan baru otomatis muncul
+      const interval = setInterval(() => {
+        Promise.all([
+          api.transaction.getBuyerTransactions({ page: 0, size: 10 }),
+          api.transaction.getSellerTransactions({ page: 0, size: 10 }),
+        ]).then(([buyerRes, sellerRes]) => {
+          if (buyerRes && parseInt(buyerRes.status) === 200 && buyerRes.data) {
+            setBuyerTrans(buyerRes.data.content || buyerRes.data || []);
+            setBuyerPage(buyerRes.data.currentPage || 0);
+            setBuyerTotalPages(buyerRes.data.totalPages || 1);
+          }
+          if (sellerRes && parseInt(sellerRes.status) === 200 && sellerRes.data) {
+            setSellerTrans(sellerRes.data.content || sellerRes.data || []);
+            setSellerPage(sellerRes.data.currentPage || 0);
+            setSellerTotalPages(sellerRes.data.totalPages || 1);
+          }
+        }).catch(() => void 0);
+      }, 4000);
+
+      return () => clearInterval(interval);
     }, [fetchTransactions])
   );
 
@@ -149,7 +182,7 @@ export default function TransactionHistoryScreen({ navigation }) {
     fetchTransactions(false, true);
   }, [fetchTransactions]);
 
-  const handleUpdateStatus = async (transId, newStatus) => {
+  const handleUpdateStatus = useCallback(async (transId, newStatus) => {
     try {
       const res = await api.transaction.updateStatus(transId, newStatus);
       if (res && parseInt(res.status) === 200) {
@@ -161,9 +194,9 @@ export default function TransactionHistoryScreen({ navigation }) {
       void 0;
       showToast(t('auth.server_error'), 'danger');
     }
-  };
+  }, [fetchTransactions, showToast, t]);
 
-  const handleContactWA = (partnerName, partnerPhone, items, total) => {
+  const handleContactWA = useCallback((partnerName, partnerPhone, items, total) => {
     if (!partnerPhone) {
       showToast(t('history.no_phone') || 'Nomor telepon tidak tersedia.', 'warning');
       return;
@@ -175,14 +208,14 @@ export default function TransactionHistoryScreen({ navigation }) {
     const msg = (t('history.wa_template') || 'Halo %{name},\nsaya ingin menghubungi mengenai pesanan COD di Thriftly:\n\n%{items}\n\n*Total:* %{total}\nBagaimana kelanjutan COD kita?')
       .replace('%{name}', partnerName)
       .replace('%{items}', itemsText)
-      .replace('%{total}', formatCurrency(total));
+      .replace('%{total}', formatCurrency(total, locale));
     
     Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`).catch(() => {
       showToast(t('history.wa_fail') || 'Gagal membuka WhatsApp', 'danger');
     });
-  };
+  }, [locale, showToast, t]);
 
-  const getStatusColor = (status) => {
+  const getStatusColor = useCallback((status) => {
     switch (status) {
       case 'Pending': return Colors.semantic.warning.main;
       case 'Accepted': return Colors.primary.blue500;
@@ -191,9 +224,9 @@ export default function TransactionHistoryScreen({ navigation }) {
       case 'Cancelled': return Colors.semantic.error.main;
       default: return theme.text.secondary;
     }
-  };
+  }, [theme.text.secondary]);
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = useCallback((status) => {
     switch (status) {
       case 'Pending': return t('status.pending') || 'Menunggu';
       case 'Accepted': return t('status.accepted') || 'COD Berlangsung';
@@ -202,9 +235,9 @@ export default function TransactionHistoryScreen({ navigation }) {
       case 'Cancelled': return t('status.cancelled') || 'Dibatalkan';
       default: return status;
     }
-  };
+  }, [t]);
 
-  const renderTransactionCard = ({ item }) => {
+  const renderTransactionCard = useCallback(({ item }) => {
     const isBuyerRole = activeTab === 'buyer';
     const partner = isBuyerRole ? item.seller : item.buyer;
     const isPending = item.status === 'Pending';
@@ -323,7 +356,7 @@ export default function TransactionHistoryScreen({ navigation }) {
             Total:
           </CustomText>
           <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 16 }}>
-            {formatCurrency(item.totalTrx)}
+            {formatCurrency(item.totalTrx, locale)}
           </CustomText>
         </View>
 
@@ -462,9 +495,11 @@ export default function TransactionHistoryScreen({ navigation }) {
         )}
       </View>
     );
-  };
+  }, [activeTab, isDark, theme, locale, t, handleUpdateStatus, handleContactWA, showAlert, navigation]);
 
-  const listData = activeTab === 'buyer' ? buyerTrans : sellerTrans;
+  const listData = useMemo(() => {
+    return activeTab === 'buyer' ? buyerTrans : sellerTrans;
+  }, [activeTab, buyerTrans, sellerTrans]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -479,7 +514,7 @@ export default function TransactionHistoryScreen({ navigation }) {
             { key: 'seller', label: t('history.tab_seller') || 'Penjualan' }
           ]}
           activeTab={activeTab}
-          onChange={setActiveTab}
+          onChange={handleTabChange}
         />
       </View>
 
@@ -492,7 +527,10 @@ export default function TransactionHistoryScreen({ navigation }) {
           data={listData}
           keyExtractor={(item) => item.idTrans}
           renderItem={renderTransactionCard}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            listData.length === 0 && { flexGrow: 1, justifyContent: 'center' }
+          ]}
           initialNumToRender={4}
           maxToRenderPerBatch={4}
           windowSize={5}

@@ -28,6 +28,7 @@ import { Shadows } from '../constants/styles';
 import CustomText from '../components/CustomText';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
+import EmptyState from '../components/EmptyState';
 import CustomAlert from '../components/CustomAlert';
 import ProductCard from '../components/ProductCard';
 import RangeSlider from '../components/RangeSlider';
@@ -37,7 +38,7 @@ import Header from '../components/Header';
 import { useLanguage } from '../localization/LanguageContext';
 import { useToast } from '../components/Toast';
 import { formatCurrency } from '../utils/formatCurrency';
-import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 
 const { width, height } = Dimensions.get('window');
@@ -95,7 +96,6 @@ export default function MyItemsScreen({ navigation }) {
   const theme = isDark ? Colors.dark : Colors.light;
   const { t, locale } = useLanguage();
   const { showToast } = useToast();
-  const isFocused = useIsFocused();
 
   const [activeStatuses, setActiveStatuses] = useState({ Available: true, Booked: true, Sold: true });
   const [items, setItems] = useState([]);
@@ -239,11 +239,12 @@ export default function MyItemsScreen({ navigation }) {
     }
   };
 
-  useEffect(() => {
-    if (isFocused) {
+  // Auto refresh data saat screen fokus (Sesuai Materi W6 Poin 28: useFocusEffect)
+  useFocusEffect(
+    useCallback(() => {
       loadMyItems(false, false);
-    }
-  }, [isFocused]);
+    }, [loadMyItems])
+  );
 
   const handleRefresh = useCallback(() => {
     loadMyItems(false, true);
@@ -264,40 +265,45 @@ export default function MyItemsScreen({ navigation }) {
     }
   };
 
-  const filteredItems = items
-    .filter(item => {
-      const matchesTab = activeStatuses[item.status] === true;
-      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const itemPrice = item.price || 0;
-      const matchesMin = minPrice === '' || itemPrice >= parseInt(minPrice);
-      const matchesMax = maxPrice === '' || itemPrice <= parseInt(maxPrice);
-      
-      const matchesCategory = selectedCategory === 'All' || item.categoryId === selectedCategory;
+  const filteredItems = useMemo(() => {
+    return items
+      .filter(item => {
+        const matchesTab = activeStatuses[item.status] === true;
+        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        const itemPrice = item.price || 0;
+        const matchesMin = minPrice === '' || itemPrice >= parseInt(minPrice);
+        const matchesMax = maxPrice === '' || itemPrice <= parseInt(maxPrice);
+        
+        const matchesCategory = selectedCategory === 'All' || item.categoryId === selectedCategory;
 
-      return matchesTab && matchesSearch && matchesMin && matchesMax && matchesCategory;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'Newest') {
-        const keyA = a.createdDate || a.idItem || '';
-        const keyB = b.createdDate || b.idItem || '';
-        return keyB.localeCompare(keyA);
-      }
-      if (sortBy === 'Oldest') {
-        const keyA = a.createdDate || a.idItem || '';
-        const keyB = b.createdDate || b.idItem || '';
-        return keyA.localeCompare(keyB);
-      }
-      if (sortBy === 'PriceAsc') {
-        return (a.price || 0) - (b.price || 0);
-      }
-      if (sortBy === 'PriceDesc') {
-        return (b.price || 0) - (a.price || 0);
-      }
-      return 0;
-    });
+        return matchesTab && matchesSearch && matchesMin && matchesMax && matchesCategory;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'Newest') {
+          const keyA = a.createdDate || a.idItem || '';
+          const keyB = b.createdDate || b.idItem || '';
+          return keyB.localeCompare(keyA);
+        }
+        if (sortBy === 'Oldest') {
+          const keyA = a.createdDate || a.idItem || '';
+          const keyB = b.createdDate || b.idItem || '';
+          return keyA.localeCompare(keyB);
+        }
+        if (sortBy === 'PriceAsc') {
+          return (a.price || 0) - (b.price || 0);
+        }
+        if (sortBy === 'PriceDesc') {
+          return (b.price || 0) - (a.price || 0);
+        }
+        return 0;
+      });
+  }, [items, activeStatuses, searchQuery, minPrice, maxPrice, selectedCategory, sortBy]);
 
-  const selectableItems = filteredItems.filter(i => i.status?.toLowerCase() === 'available');
+  const selectableItems = useMemo(() => {
+    return filteredItems.filter(i => i.status?.toLowerCase() === 'available');
+  }, [filteredItems]);
+
   const isAllSelected = selectableItems.length > 0 && selectedItems.length === selectableItems.length;
 
   const handleDelete = async (id) => {
@@ -588,7 +594,10 @@ export default function MyItemsScreen({ navigation }) {
          Items List
       ========================================== */}
       <ScrollView 
-        contentContainerStyle={styles.listContainer} 
+        contentContainerStyle={[
+          styles.listContainer,
+          filteredItems.length === 0 && { flexGrow: 1, justifyContent: 'center' }
+        ]} 
         showsVerticalScrollIndicator={false}
         onScroll={({ nativeEvent }) => {
           if (isCloseToBottom(nativeEvent)) {
@@ -610,27 +619,13 @@ export default function MyItemsScreen({ navigation }) {
             <ActivityIndicator size="large" color={Colors.primary.blue500} />
           </View>
         ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrapper}>
-              <Ionicons name="cube-outline" size={64} color={Colors.primary.blue500} />
-            </View>
-            <CustomText variant="h2" style={{ color: theme.text.primary, marginBottom: 8, textAlign: 'center' }}>
-              {t('myitems.empty_title')}
-            </CustomText>
-            <CustomText variant="body" style={{ color: theme.text.secondary, textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 }}>
-              {searchQuery ? t('myitems.empty_search') : t('myitems.empty_state')}
-            </CustomText>
-
-            {!searchQuery && (
-              <CustomButton
-                title={t('myitems.start_selling')}
-                type="primary"
-                icon={<Ionicons name="add-circle-outline" size={20} color={Colors.light.surface} />}
-                onPress={() => navigation.navigate('PostItem')}
-                style={{ width: '80%' }}
-              />
-            )}
-          </View>
+          <EmptyState
+            title={t('myitems.empty_title')}
+            description={searchQuery ? t('myitems.empty_search') : t('myitems.empty_state')}
+            icon="cube"
+            buttonTitle={!searchQuery ? t('myitems.start_selling') : undefined}
+            onButtonPress={!searchQuery ? () => navigation.navigate('PostItem') : undefined}
+          />
         ) : (
           <View style={styles.listWrapper}>
             {isSelectionMode && (
@@ -731,10 +726,10 @@ export default function MyItemsScreen({ navigation }) {
                   style={[styles.listContent, { backgroundColor: isDark ? 'rgba(30,41,59,0.5)' : 'rgba(255,255,255,0.6)' }]}
                 >
                   {/* Group 1: Title & Description */}
-                  <View style={{ width: '100%' }}>
+                  <View style={{ flex: 1, width: '100%', minHeight: 0, justifyContent: 'flex-start' }}>
                     {/* Top row: Name (left) & Status (right) */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 4 }}>
-                      <CustomText variant="body-bold" numberOfLines={1} style={{ color: theme.text.primary, flex: 1, marginRight: 8, fontSize: 15 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 2 }}>
+                      <CustomText variant="body-bold" numberOfLines={1} style={{ color: theme.text.primary, flex: 1, marginRight: 8, fontSize: 14 }}>
                         {item.title}
                       </CustomText>
                       <View 
@@ -747,8 +742,8 @@ export default function MyItemsScreen({ navigation }) {
                     </View>
 
                     {/* Middle: Description & Category */}
-                    <View style={{ marginBottom: 6 }}>
-                      <CustomText numberOfLines={2} style={{ color: theme.text.secondary, fontSize: 12, fontFamily: 'Barlow-Regular', marginBottom: 4 }}>
+                    <View style={{ flex: 1, justifyContent: 'flex-start', minHeight: 0 }}>
+                      <CustomText numberOfLines={1} style={{ color: theme.text.secondary, fontSize: 12, fontFamily: 'Barlow-Regular', marginBottom: 4 }}>
                         {item.description || 'Tidak ada deskripsi yang tersedia.'}
                       </CustomText>
                       {item.categoryName && (
@@ -763,9 +758,9 @@ export default function MyItemsScreen({ navigation }) {
                   </View>
 
                   {/* Bottom: Price */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingTop: 4 }}>
                     <CustomText style={{ color: Colors.primary.blue500, fontFamily: 'Barlow-Bold', fontSize: 14 }}>
-                      {formatCurrency(item.price)}
+                      {formatCurrency(item.price, locale)}
                     </CustomText>
                     <Ionicons name="chevron-forward" size={14} color={theme.text.secondary} />
                   </View>

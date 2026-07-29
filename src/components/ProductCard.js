@@ -1,7 +1,7 @@
 /* ==========================================
    Komponen Layar Product Card
 ========================================== */
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -29,11 +29,11 @@ import { selectCartItems, toggleCartOptimistic, toggleCartApi } from '../store/s
 export default function ProductCard({
   item,
   onPress,
-  onFavoritePress,
-  isFavorite = false,
+  onCartPress,
+  isInCart = false,
   isSelectable = false,
   isSelected = false,
-  layout = 'grid', // grid | popular  //
+  layout = 'grid', // grid | popular | masonry | list
   userLocation,
   onLongPress,
   style,
@@ -49,9 +49,9 @@ export default function ProductCard({
 
   // Menggunakan state dari Redux atau properti jika diberikan
   const id = item.idItem || item.id;
-  const isItemFavorited = isFavorite || cartItems.includes(id);
+  const isItemInCart = isInCart || cartItems.includes(id);
 
-  const cardStyles = getStyles(theme, isDark);
+  const cardStyles = useMemo(() => getStyles(theme, isDark), [isDark]);
 
   const isPopular = layout === 'popular';
   const isMasonry = layout === 'masonry';
@@ -71,9 +71,9 @@ export default function ProductCard({
     return heights[Math.abs(hash) % heights.length];
   };
 
-  const handleFavoritePress = () => {
-    if (!isItemFavorited) {
-      // Saat di-like: Pantulan + Partikel
+  const handleCartPress = () => {
+    if (!isItemInCart) {
+      // Saat dimasukkan ke keranjang: Pantulan + Partikel
       particleAnim.setValue(0);
       Animated.parallel([
         Animated.sequence([
@@ -83,7 +83,7 @@ export default function ProductCard({
         Animated.timing(particleAnim, { toValue: 1, duration: 400, useNativeDriver: true })
       ]).start();
     } else {
-      // Saat di-unlike: Cuma mantul mengecil
+      // Saat dihapus dari keranjang: Cuma mantul mengecil
       Animated.sequence([
         Animated.timing(scaleAnim, { toValue: 0.8, duration: 100, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
@@ -94,8 +94,8 @@ export default function ProductCard({
       dispatch(toggleCartOptimistic(id));
       dispatch(toggleCartApi(id));
     }
-    if (onFavoritePress) {
-      onFavoritePress();
+    if (onCartPress) {
+      onCartPress();
     }
   };
 
@@ -120,9 +120,11 @@ export default function ProductCard({
     if (item.distance) return `${item.distance} km`;
 
     if (item.latitude && item.longitude) {
-      // Menggunakan lokasi asli user jika ada, jika tidak gunakan lokasi mock (Politeknik Astra)
-      const userLat = userLocation ? userLocation.latitude : -6.3475;
-      const userLon = userLocation ? userLocation.longitude : 107.1486;
+      if (!userLocation) {
+        return item.locationName || item.location || '-';
+      }
+      const userLat = userLocation.latitude;
+      const userLon = userLocation.longitude;
       const R = 6371; // Radius bumi dalam km
       const dLat = (item.latitude - userLat) * (Math.PI / 180);
       const dLon = (item.longitude - userLon) * (Math.PI / 180);
@@ -184,8 +186,8 @@ export default function ProductCard({
           {/* Badge status di pojok kanan atas  // */}
           {renderStatusBadge(item.status)}
 
-          {/* Tombol favorit & Partikel */}
-          <View style={cardStyles.heartContainer}>
+          {/* Tombol keranjang & Partikel */}
+          <View style={cardStyles.cartButtonContainer}>
             {/* Partikel Bulet-Bulet */}
             {Array.from({ length: 6 }).map((_, i) => {
               const angle = (i * 360) / 6;
@@ -230,21 +232,21 @@ export default function ProductCard({
 
             <TouchableOpacity
               style={[
-                cardStyles.heartCircle,
-                isItemFavorited && {
-                  backgroundColor: isDark ? 'rgba(255, 214, 0, 0.2)' : '#FEF3C7',
-                  borderWidth: 1,
-                  borderColor: isDark ? Colors.primary.yellow500 : '#F59E0B',
-                }
+                cardStyles.cartCircle,
+                isItemInCart && cardStyles.cartCircleActive
               ]}
-              onPress={handleFavoritePress}
+              onPress={handleCartPress}
               activeOpacity={0.8}
             >
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 <Ionicons
-                  name={isItemFavorited ? "cart" : "cart-outline"}
+                  name={isItemInCart ? "cart" : "cart-outline"}
                   size={16}
-                  color={isItemFavorited ? (isDark ? Colors.primary.yellow500 : '#B45309') : theme.text.placeholder}
+                  color={
+                    isItemInCart
+                      ? (isDark ? Colors.primary.yellow500 : Colors.semantic.warning.dark)
+                      : (isDark ? Colors.common.white : Colors.light.text.primary)
+                  }
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -341,18 +343,26 @@ export default function ProductCard({
               </CustomText>
             </View>
 
-            {/* Favorite / Delete Button on the far right */}
+            {/* Cart Button on the far right */}
             <View style={{ justifyContent: 'flex-end', alignItems: 'center', marginLeft: 8 }}>
               <TouchableOpacity
-                style={[cardStyles.heartCircle, { width: 36, height: 36, borderRadius: 18 }]}
-                onPress={handleFavoritePress}
+                style={[
+                  cardStyles.cartCircle,
+                  { width: 36, height: 36, borderRadius: 18 },
+                  isItemInCart && cardStyles.cartCircleActive
+                ]}
+                onPress={handleCartPress}
                 activeOpacity={0.8}
               >
                 <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                  <MaterialIcons
-                    name={isItemFavorited ? "bookmark" : "bookmark-border"}
+                  <Ionicons
+                    name={isItemInCart ? "cart" : "cart-outline"}
                     size={20}
-                    color={isItemFavorited ? Colors.primary.yellow500 : theme.text.placeholder}
+                    color={
+                      isItemInCart
+                        ? (isDark ? Colors.primary.yellow500 : Colors.semantic.warning.dark)
+                        : (isDark ? Colors.common.white : Colors.light.text.primary)
+                    }
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -379,7 +389,7 @@ export default function ProductCard({
             </CustomText>
             <View style={cardStyles.locationWrapper}>
               <MaterialIcons name="location-on" size={10} color={theme.text.placeholder} />
-              <CustomText type="caption" style={cardStyles.productLocation}>
+              <CustomText type="caption" style={cardStyles.productLocation} numberOfLines={1}>
                 {getDistanceText()}
               </CustomText>
             </View>
@@ -480,20 +490,31 @@ const getStyles = (theme, isDark) => {
     gridProductEmoji: {
       fontSize: 44,
     },
-    heartContainer: {
+    cartButtonContainer: {
       position: 'absolute',
       top: 10,
       right: 10,
       zIndex: 10,
     },
-    heartCircle: {
+    cartCircle: {
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: theme.surface,
+      backgroundColor: isDark ? Colors.dark.surface : Colors.light.surface,
       alignItems: 'center',
       justifyContent: 'center',
-      ...Shadows.light,
+      borderWidth: 1,
+      borderColor: isDark ? Colors.dark.border : Colors.light.border,
+      // Bayangan bundar presisi (tanpa artifact bayangan kotak)
+      shadowColor: Colors.common.black,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.35 : 0.12,
+      shadowRadius: 3,
+      elevation: 3,
+    },
+    cartCircleActive: {
+      backgroundColor: isDark ? Colors.dark.surface : Colors.semantic.warning.light,
+      borderColor: isDark ? Colors.primary.yellow500 : Colors.semantic.warning.main,
     },
     statusBadge: {
       position: 'absolute',
@@ -517,15 +538,19 @@ const getStyles = (theme, isDark) => {
       alignItems: 'center',
       justifyContent: 'space-between',
       marginTop: 2,
+      gap: 6,
     },
     locationWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 2,
+      flex: 1,
+      justifyContent: 'flex-end',
     },
     productLocation: {
       fontSize: 10,
       color: theme.text.placeholder,
+      flexShrink: 1,
     },
     productPrice: {
       fontSize: 13,

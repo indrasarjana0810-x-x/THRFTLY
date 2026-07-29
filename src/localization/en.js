@@ -82,6 +82,15 @@ export default {
   "auth.remember_password": "Remember your password?",
   "auth.toast_email_not_found": "NIM or Email is not registered!",
   "auth.toast_password_update_failed": "Failed to reset password",
+  "auth.toast_password_updated": "Password Updated!",
+  "auth.toast_password_updated_desc": "Your password has been successfully changed. Please log in with your new password.",
+  "auth.continue_login_btn": "Continue to Login",
+  "auth.toast_new_password_required": "New password is required",
+  "auth.confirm_password_required": "Password confirmation is required",
+  "auth.toast_password_mismatch": "Password confirmation does not match",
+  "auth.nim_email_required": "NIM or Email is required",
+  "auth.otp_required": "Enter 6 digit OTP code",
+  "auth.password_min_length": "Password must be at least 8 characters",
 
   /* ---------- Auth Umum ---------- */
   "auth.register_now": "Register Now",
@@ -93,8 +102,6 @@ export default {
   "auth.login_now": "Log In Now",
   "auth.password_min_placeholder": "Minimum 8 characters",
   "auth.toast_server_error": "Failed to contact backend server.",
-  "auth.toast_new_password_required": "New password is required",
-  "auth.toast_password_mismatch": "Password confirmation does not match",
 
   /* ---------- Study Programs ---------- */
   "prodi.konstruksi_gedung": "Building Construction Technology",
@@ -516,5 +523,6 @@ export default {
   "detail.checksheet_title": "Physical Condition (Check Sheet)",
   "detail.checksheet_failed_count": "There are {count} minus notes from the seller",
   "detail.open_wa_err": "Failed to open WhatsApp.",
-  "cart.item_unavailable_btn": "Already Booked"
+  "cart.item_unavailable_btn": "Already Booked",
+  "cart.item_sold_btn": "Already Sold"
 };

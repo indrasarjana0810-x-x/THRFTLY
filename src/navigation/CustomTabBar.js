@@ -3,20 +3,22 @@
 ========================================== */
 /* ---------- Impor ---------- */
 import React, { useEffect, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions, useColorScheme, Animated } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Dimensions, useColorScheme, Animated, Text } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { useSelector, useDispatch } from 'react-redux';
 import Colors from '../constants/colors';
 import { useLanguage } from '../localization/LanguageContext';
+import { fetchCart, selectCartItems } from '../store/slices/cartSlice';
 
 /* ---------- Bantuan Geometri ---------- */
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const NAV_BAR_WIDTH = SCREEN_WIDTH * 0.88;
+const NAV_BAR_WIDTH = Math.min(SCREEN_WIDTH * 0.92, 420);
 const NAV_BAR_HEIGHT = 64;
 const NAV_BAR_RADIUS = 25;
-const NOTCH_RADIUS = 45;
+const NOTCH_RADIUS = Math.min(NAV_BAR_WIDTH * 0.12, 42);
 const FAB_SIZE = 56;
 
 const getNavBarPath = (width, height, radius, notchRadius, notchCenterX) => {
@@ -51,6 +53,14 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
+
+  const dispatch = useDispatch();
+  const cartItems = useSelector(selectCartItems);
+  const cartCount = Array.isArray(cartItems) ? cartItems.length : 0;
+
+  useEffect(() => {
+    dispatch(fetchCart());
+  }, [dispatch]);
 
   const navBarPath = getNavBarPath(
     NAV_BAR_WIDTH,
@@ -135,6 +145,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
                   onPress={onPress}
                   iconName={getIconName(route.name, isFocused)}
                   label={getLabel(route.name)}
+                  badgeCount={route.name === 'CartTab' ? cartCount : 0}
                   isDark={isDark}
                   theme={theme}
                 />
@@ -149,6 +160,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
               onPress={onPress}
               iconName={getIconName(route.name, isFocused)}
               label={getLabel(route.name)}
+              badgeCount={route.name === 'CartTab' ? cartCount : 0}
               isDark={isDark}
               theme={theme}
             />
@@ -167,7 +179,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   );
 }
 
-const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, isDark, theme }) => {
+const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, badgeCount = 0, isDark, theme }) => {
   const animValue = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
 
   useEffect(() => {
@@ -199,7 +211,16 @@ const AnimatedVerticalTab = ({ isFocused, onPress, iconName, label, isDark, them
       activeOpacity={0.8}
     >
       <Animated.View style={{ transform: [{ translateY: iconTranslateY }], alignItems: 'center' }}>
-        <Ionicons name={iconName} size={24} color={iconColor} />
+        <View style={{ position: 'relative' }}>
+          <Ionicons name={iconName} size={24} color={iconColor} />
+          {badgeCount > 0 && (
+            <View style={[styles.badge, { borderColor: isDark ? Colors.dark.background : Colors.common.white }]} pointerEvents="none">
+              <Text style={styles.badgeText}>
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </Text>
+            </View>
+          )}
+        </View>
       </Animated.View>
       
       <Animated.View
@@ -238,13 +259,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: NAV_BAR_HEIGHT,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
   },
   navItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 56,
     height: '100%',
   },
   navItemLabel: {
@@ -280,4 +301,29 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 3,
     borderBottomRightRadius: 3,
   },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.semantic?.error?.main || '#EF4444',
+    borderWidth: 1.5,
+    borderColor: Colors.common.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    zIndex: 10,
+  },
+  badgeText: {
+    color: Colors.common.white,
+    fontSize: 9,
+    fontFamily: 'Barlow-Bold',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    lineHeight: 12,
+  },
 });
+

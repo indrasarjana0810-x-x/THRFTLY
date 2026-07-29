@@ -73,11 +73,13 @@ const getStyles = (theme) => {
       fontFamily: 'Barlow-Regular',
       fontSize: 14,
       lineHeight: 20,
+      color: theme.text.primary,
     },
     bodyBold: {
       fontFamily: 'Barlow-Bold',
       fontSize: 14,
       lineHeight: 20,
+      color: theme.text.primary,
     },
     caption: {
       fontFamily: 'Barlow-Regular',

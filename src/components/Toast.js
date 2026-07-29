@@ -1,7 +1,7 @@
 /* ==========================================
    Komponen Layar Toast
 ========================================== */
-import React, { createContext, useContext, useState, useRef } from "react";
+import React, { createContext, useContext, useState, useRef, useCallback, useMemo } from "react";
 import { StyleSheet, View, Text, Animated, Platform, TouchableOpacity } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "../constants/colors";
@@ -16,12 +16,21 @@ export function ToastProvider({ children }) {
   const progressWidth = useRef(new Animated.Value(1)).current;
   const timeoutRef = useRef(null);
 
-  const showToast = (message, type = "info") => {
+  const hideToast = useCallback(() => {
+    Animated.timing(translateY, {
+      toValue: -150,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    });
+  }, [translateY]);
+
+  const showToast = useCallback((message, type = "info") => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Jika toast sedang aktif, turunkan/naikkan cepat lalu ganti teks  //
     if (toast.visible) {
       Animated.timing(translateY, {
         toValue: -150,
@@ -31,7 +40,6 @@ export function ToastProvider({ children }) {
         setToast({ message, type, visible: true });
         progressWidth.setValue(1);
 
-        // Slide kembali ke bawah dengan teks baru  //
         Animated.spring(translateY, {
           toValue: Platform.OS === "android" ? 50 : 60,
           useNativeDriver: true,
@@ -39,7 +47,6 @@ export function ToastProvider({ children }) {
           friction: 8,
         }).start();
 
-        // Jalankan progress bar penyusutan  //
         Animated.timing(progressWidth, {
           toValue: 0,
           duration: 3000,
@@ -54,7 +61,6 @@ export function ToastProvider({ children }) {
       setToast({ message, type, visible: true });
       progressWidth.setValue(1);
 
-      // Slide ke bawah  //
       Animated.spring(translateY, {
         toValue: Platform.OS === "android" ? 50 : 60,
         useNativeDriver: true,
@@ -62,7 +68,6 @@ export function ToastProvider({ children }) {
         friction: 8,
       }).start();
 
-      // Jalankan progress bar penyusutan  //
       Animated.timing(progressWidth, {
         toValue: 0,
         duration: 3000,
@@ -73,17 +78,9 @@ export function ToastProvider({ children }) {
         hideToast();
       }, 3000);
     }
-  };
+  }, [toast.visible, translateY, progressWidth, hideToast]);
 
-  const hideToast = () => {
-    Animated.timing(translateY, {
-      toValue: -150,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => {
-      setToast((prev) => ({ ...prev, visible: false }));
-    });
-  };
+  const contextValue = useMemo(() => ({ showToast, hideToast }), [showToast, hideToast]);
 
   const getToastStyle = () => {
     switch (toast.type) {
@@ -147,7 +144,7 @@ export function ToastProvider({ children }) {
   };
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {toast.visible && (
         <Animated.View

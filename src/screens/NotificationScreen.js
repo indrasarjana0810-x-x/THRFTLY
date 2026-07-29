@@ -1,7 +1,7 @@
 /* ==========================================
    Komponen Layar Notification
 ========================================== */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, useColorScheme, ActivityIndicator, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -39,6 +39,8 @@ export default function NotificationScreen({ navigation }) {
   const [notifPermAlertVisible, setNotifPermAlertVisible] = useState(false);
   const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
+  const permissionCheckedRef = useRef(false);
+
   const fetchNotifications = useCallback(async (isLoadMore = false, isRefreshing = false) => {
     if (loadingMore) return;
 
@@ -59,14 +61,17 @@ export default function NotificationScreen({ navigation }) {
 
     try {
       const res = await api.notifications.get({ page: currentPage, size: 10 });
-      if (res && parseInt(res.status) === 200 && res.data) {
+      if (res && (parseInt(res.status) === 200 || parseInt(res.status) === 201) && res.data) {
+        const notifList = Array.isArray(res.data) 
+          ? res.data 
+          : (res.data.notifications || res.data.content || []);
         if (isLoadMore) {
-          setNotifications(prev => [...prev, ...(res.data.notifications || [])]);
+          setNotifications(prev => [...prev, ...notifList]);
         } else {
-          setNotifications(res.data.notifications || []);
+          setNotifications(notifList);
         }
-        setPage(res.data.currentPage || 0);
-        setTotalPages(res.data.totalPages || 1);
+        setPage(res.data.currentPage ?? res.data.number ?? 0);
+        setTotalPages(res.data.totalPages ?? 1);
       }
     } catch (e) {
       void 0;
@@ -79,19 +84,24 @@ export default function NotificationScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      fetchNotifications();
-      requestNotificationPermission();
-    }, [])
+      fetchNotifications(false, false);
+    }, [fetchNotifications])
   );
+
+  useEffect(() => {
+    if (!permissionCheckedRef.current) {
+      permissionCheckedRef.current = true;
+      requestNotificationPermission();
+    }
+  }, []);
 
   const requestNotificationPermission = async () => {
     try {
       const hasAsked = await AsyncStorage.getItem('hasAskedNotifPerm');
-      if (hasAsked) return; // Sudah pernah ditanyakan, jangan pernah tampilkan lagi
+      if (hasAsked) return;
 
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       if (existingStatus !== 'granted') {
-        // Tampilkan murni Custom Modal bikinan kita sendiri
         setNotifPermAlertVisible(true);
       }
     } catch (error) {
@@ -112,7 +122,6 @@ export default function NotificationScreen({ navigation }) {
 
   const fetchAndSavePushToken = async () => {
     try {
-      // Avoid fetching token in Expo Go as it's no longer supported in SDK 53
       if (Constants.appOwnership === 'expo') {
         return;
       }
@@ -127,7 +136,7 @@ export default function NotificationScreen({ navigation }) {
         api.users.saveToken(tokenData.data).catch(() => { });
       }
     } catch (error) {
-      // Silently ignore push token errors to prevent spamming logs in dev
+      void 0;
     }
   };
 
@@ -151,12 +160,10 @@ export default function NotificationScreen({ navigation }) {
     if (isSelectionMode) {
       toggleSelection(item.idNotif);
     } else {
-      // Mark as read automatically when clicked
       if (!item.isRead) {
         handleMarkAsRead(item);
       }
 
-      // Check if it's an order-related notification
       const isOrderRelated = [
         'Pesanan COD Baru',
         'Pesanan Diterima',
@@ -168,7 +175,6 @@ export default function NotificationScreen({ navigation }) {
       if (isOrderRelated) {
         navigation.navigate('TransactionHistory');
       } else {
-        // Expand/collapse logic for normal messages
         if (expandedIds.includes(item.idNotif)) {
           setExpandedIds(prev => prev.filter(id => id !== item.idNotif));
         } else {
@@ -230,8 +236,6 @@ export default function NotificationScreen({ navigation }) {
     }
   };
 
-
-
   const renderSelectAllHeader = () => {
     if (!isSelectionMode) return null;
     const isAllSelected = selectedIds.length === notifications.length && notifications.length > 0;
@@ -285,30 +289,42 @@ export default function NotificationScreen({ navigation }) {
   const renderNotification = ({ item }) => {
     const isSelected = selectedIds.includes(item.idNotif);
 
-    // Format tanggal sederhana, kalau mau bisa pakai moment.js atau date-fns
     const dateObj = new Date(item.createdDate || Date.now());
     const formattedDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}/${dateObj.getFullYear()}`;
 
+    const rawTitle = (item.title || '').trim().toLowerCase();
     let translatedTitle = item.title;
     let translatedMessage = item.message;
 
-    if (item.title === 'Pesanan COD Baru') {
+    if (rawTitle.includes('baru') || rawTitle.includes('new')) {
       translatedTitle = t('notif_type.new_order_title') || item.title;
-      const name = item.message.replace(' telah mengajukan pesanan COD baru untuk produk Anda.', '');
+      const name = item.message
+        .replace(/telah mengajukan pesanan COD baru untuk produk Anda\./gi, '')
+        .replace(/has requested a new COD order for your product\./gi, '')
+        .trim();
       translatedMessage = (t('notif_type.new_order_msg') || item.message).replace('%{name}', name);
-    } else if (item.title === 'Pesanan Diterima') {
+    } else if (rawTitle.includes('diterima') || rawTitle.includes('accepted')) {
       translatedTitle = t('notif_type.accepted_title') || item.title;
-      const name = item.message.replace(' telah menerima pesanan COD Anda. Silakan hubungi via WhatsApp.', '');
+      const name = item.message
+        .replace(/telah menerima pesanan COD Anda\. Silakan hubungi via WhatsApp\./gi, '')
+        .replace(/has accepted your COD order\. Please contact via WhatsApp\./gi, '')
+        .trim();
       translatedMessage = (t('notif_type.accepted_msg') || item.message).replace('%{name}', name);
-    } else if (item.title === 'Pesanan Ditolak') {
+    } else if (rawTitle.includes('ditolak') || rawTitle.includes('rejected')) {
       translatedTitle = t('notif_type.rejected_title') || item.title;
-      const name = item.message.replace(' telah menolak pesanan COD Anda.', '');
+      const name = item.message
+        .replace(/telah menolak pesanan COD Anda\./gi, '')
+        .replace(/has rejected your COD order\./gi, '')
+        .trim();
       translatedMessage = (t('notif_type.rejected_msg') || item.message).replace('%{name}', name);
-    } else if (item.title === 'Pesanan Dibatalkan') {
+    } else if (rawTitle.includes('dibatalkan') || rawTitle.includes('cancelled')) {
       translatedTitle = t('notif_type.cancelled_title') || item.title;
-      const name = item.message.replace(' telah membatalkan pesanan COD.', '');
+      const name = item.message
+        .replace(/telah membatalkan pesanan COD\./gi, '')
+        .replace(/has cancelled the COD order\./gi, '')
+        .trim();
       translatedMessage = (t('notif_type.cancelled_msg') || item.message).replace('%{name}', name);
-    } else if (item.title === 'Transaksi Selesai') {
+    } else if (rawTitle.includes('selesai') || rawTitle.includes('completed')) {
       translatedTitle = t('notif_type.completed_title') || item.title;
       translatedMessage = t('notif_type.completed_msg') || item.message;
     }
@@ -358,7 +374,7 @@ export default function NotificationScreen({ navigation }) {
           <View style={styles.titleRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
               {!item.isRead && <View style={styles.unreadDot} />}
-              <CustomText style={styles.title} type="body-bold" numberOfLines={1}>{translatedTitle}</CustomText>
+              <CustomText style={styles.title} color={theme.text.primary} type="body-bold" numberOfLines={1}>{translatedTitle}</CustomText>
             </View>
             <CustomText style={styles.timestamp} color={theme.text.tertiary} type="caption">{formattedDate}</CustomText>
           </View>
@@ -393,43 +409,49 @@ export default function NotificationScreen({ navigation }) {
         title={t('notification.title') || 'Notifikasi'}
         noBorder={true}
       />
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={Colors.primary.blue500} />
-        </View>
-      ) : notifications.length === 0 ? (
-        <EmptyState
-          title={t('notification.empty_title') || 'Tidak Ada Notifikasi'}
-          description={t('notification.empty_desc') || 'Anda belum memiliki notifikasi baru saat ini.'}
-          icon="notifications"
-        />
-      ) : (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => item.idNotif}
-          renderItem={renderNotification}
-          ListHeaderComponent={renderSelectAllHeader}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          onEndReached={() => fetchNotifications(true, false)}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator size="small" color={Colors.primary.blue500} style={{ padding: 20 }} />
-            ) : (
-              <View style={{ height: 20 }} />
-            )
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[Colors.primary.blue500]}
-              tintColor={Colors.primary.blue500}
-            />
-          }
-        />
-      )}
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.primary.blue500} />
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => String(item.idNotif || item.id)}
+            renderItem={renderNotification}
+            ListHeaderComponent={renderSelectAllHeader}
+            contentContainerStyle={[
+              styles.listContent,
+              notifications.length === 0 && { flexGrow: 1, justifyContent: 'center' }
+            ]}
+            showsVerticalScrollIndicator={false}
+            onEndReached={() => fetchNotifications(true, false)}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={
+              <EmptyState
+                title={t('notification.empty_title') || 'Tidak Ada Notifikasi'}
+                description={t('notification.empty_desc') || 'Anda belum memiliki notifikasi baru saat ini.'}
+                icon="notifications"
+              />
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <ActivityIndicator size="small" color={Colors.primary.blue500} style={{ padding: 20 }} />
+              ) : (
+                <View style={{ height: 20 }} />
+              )
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.primary.blue500]}
+                tintColor={Colors.primary.blue500}
+              />
+            }
+          />
+        )}
+      </View>
 
       {isSelectionMode && (
         <View style={{
@@ -472,7 +494,7 @@ export default function NotificationScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       )}
-      {/* --- PRE-PERMISSION NOTIFICATION ALERT --- */}
+
       <CustomAlert
         visible={notifPermAlertVisible}
         type="info"
@@ -508,7 +530,7 @@ const getStyles = (theme, isDark) => StyleSheet.create({
   listContent: {
     padding: 16,
     paddingTop: 8,
-    paddingBottom: 80, // Extra padding for bottom bar
+    paddingBottom: 80,
   },
   notificationCard: {
     padding: 16,

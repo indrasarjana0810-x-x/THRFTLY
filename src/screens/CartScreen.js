@@ -1,7 +1,7 @@
 /* ==========================================
    Komponen Layar Layar Keranjang
 ========================================== */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,8 +15,10 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCartItems, toggleCartOptimistic, toggleCartApi, fetchCart } from '../store/slices/cartSlice';
@@ -43,10 +45,19 @@ export default function CartScreen({ navigation }) {
   const cartItemIds = useSelector(selectCartItems) || [];
   const [cartItems, setCartItems] = useState([]);
   const [fetchingCart, setFetchingCart] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch latest cart items from backend on mount
-  useEffect(() => {
-    dispatch(fetchCart());
+  // Auto refresh cart whenever screen comes into focus (Sesuai Materi W6 Poin 28: useFocusEffect)
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchCart());
+    }, [dispatch])
+  );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await dispatch(fetchCart());
+    setRefreshing(false);
   }, [dispatch]);
 
   // Load detailed item objects for all cart IDs
@@ -54,9 +65,17 @@ export default function CartScreen({ navigation }) {
     const loadCartItemsFromApi = async () => {
       if (!cartItemIds || cartItemIds.length === 0) {
         setCartItems([]);
+        setFetchingCart(false);
         return;
       }
-      setFetchingCart(true);
+      // Hanya tampilkan spinner loading jika data di layar masih benar-benar kosong
+      setCartItems(prev => {
+        if (!prev || prev.length === 0) {
+          setFetchingCart(true);
+        }
+        return prev;
+      });
+
       try {
         const results = [];
         for (const id of cartItemIds) {
@@ -88,34 +107,35 @@ export default function CartScreen({ navigation }) {
   const [meetingNote, setMeetingNote] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Group items by Seller
-  const groupedCart = cartItems.reduce((acc, item) => {
-    const sellerId = item.sellerId || 'unknown';
-    const sellerName = item.sellerName || 'Penjual Thriftly';
-    const sellerPhone = item.sellerPhone || '';
-    const sellerAvatar = item.sellerAvatar || null;
-    
-    if (!acc[sellerId]) {
-      acc[sellerId] = {
-        sellerId,
-        sellerName,
-        sellerPhone,
-        sellerAvatar,
-        items: []
-      };
-    }
-    acc[sellerId].items.push(item);
-    return acc;
-  }, {});
+  // Group items by Seller (memoized using useMemo to avoid re-grouping on every render/keystroke)
+  const groupedList = useMemo(() => {
+    const grouped = cartItems.reduce((acc, item) => {
+      const sellerId = item.sellerId || 'unknown';
+      const sellerName = item.sellerName || 'Penjual Thriftly';
+      const sellerPhone = item.sellerPhone || '';
+      const sellerAvatar = item.sellerAvatar || null;
+      
+      if (!acc[sellerId]) {
+        acc[sellerId] = {
+          sellerId,
+          sellerName,
+          sellerPhone,
+          sellerAvatar,
+          items: []
+        };
+      }
+      acc[sellerId].items.push(item);
+      return acc;
+    }, {});
+    return Object.values(grouped);
+  }, [cartItems]);
 
-  const groupedList = Object.values(groupedCart);
-
-  const handleRemoveItem = (itemId) => {
+  const handleRemoveItem = useCallback((itemId) => {
     dispatch(toggleCartOptimistic(itemId));
     dispatch(toggleCartApi(itemId));
-  };
+  }, [dispatch]);
 
-  const openCheckoutModal = (sellerGroup) => {
+  const openCheckoutModal = useCallback((sellerGroup) => {
     const availableItems = sellerGroup.items.filter(i => {
       const s = (i.status || '').toLowerCase();
       return s === '' || s === 'available' || s === 'tersedia';
@@ -137,9 +157,9 @@ export default function CartScreen({ navigation }) {
     setSelectedItems(availableItems);
     setMeetingNote('');
     setCheckoutModalVisible(true);
-  };
+  }, [locale, showToast]);
 
-  const handleCheckout = async () => {
+  const handleCheckout = useCallback(async () => {
     if (!selectedSellerId || selectedItems.length === 0) return;
     
     setLoading(true);
@@ -165,20 +185,20 @@ export default function CartScreen({ navigation }) {
           if (phone.startsWith('0')) phone = '62' + phone.slice(1);
 
           let itemsListText = selectedItems.map((item, idx) => {
-            return `${idx + 1}. *${item.title}* (${formatCurrency(item.price)})`;
+            return `${idx + 1}. *${item.title}* (${formatCurrency(item.price, locale)})`;
           }).join('\n');
 
           const total = selectedItems.reduce((sum, item) => sum + Number(item.price), 0);
           
           let msg = '';
           if (locale === 'id') {
-            msg = `Halo ${selectedSellerName},\nSaya tertarik untuk membeli produk berikut di Thriftly:\n\n${itemsListText}\n\n*Total:* ${formatCurrency(total)}`;
+            msg = `Halo ${selectedSellerName},\nSaya tertarik untuk membeli produk berikut di Thriftly:\n\n${itemsListText}\n\n*Total:* ${formatCurrency(total, locale)}`;
             if (meetingNote.trim()) {
               msg += `\n*Catatan Pertemuan COD:* ${meetingNote.trim()}`;
             }
             msg += `\n\nApakah produk-produk tersebut masih tersedia untuk dibeli dengan metode COD? Terima kasih.`;
           } else {
-            msg = `Hello ${selectedSellerName},\nI am interested in purchasing the following products on Thriftly:\n\n${itemsListText}\n\n*Total:* ${formatCurrency(total)}`;
+            msg = `Hello ${selectedSellerName},\nI am interested in purchasing the following products on Thriftly:\n\n${itemsListText}\n\n*Total:* ${formatCurrency(total, locale)}`;
             if (meetingNote.trim()) {
               msg += `\n*COD Meeting Notes:* ${meetingNote.trim()}`;
             }
@@ -198,17 +218,19 @@ export default function CartScreen({ navigation }) {
         // Navigate to Transaction History or Profile
         navigation.navigate('ProfileTab');
       } else {
-        showToast(res.message || t('common.error'), 'danger');
+        dispatch(fetchCart());
+        showToast(res?.message || (locale === 'id' ? 'Maaf, salah satu barang baru saja dipesan oleh pembeli lain.' : 'Sorry, one of the items was just booked by another buyer.'), 'warning');
       }
     } catch (err) {
-      void 0;
-      showToast(t('auth.server_error'), 'danger');
+      dispatch(fetchCart());
+      const errMsg = err?.response?.data?.message || err?.message || (locale === 'id' ? 'Maaf, barang tersebut baru saja dipesan oleh pembeli lain.' : 'Sorry, the item was just booked by another buyer.');
+      showToast(errMsg, 'warning');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSellerId, selectedItems, meetingNote, dispatch, showToast, t, selectedSellerPhone, selectedSellerName, locale, navigation]);
 
-  const renderSellerGroup = ({ item: sellerGroup }) => {
+  const renderSellerGroup = useCallback(({ item: sellerGroup }) => {
     const totalGroupPrice = sellerGroup.items.reduce((sum, i) => sum + Number(i.price), 0);
     const availableItems = sellerGroup.items.filter(i => {
       const s = (i.status || '').toLowerCase();
@@ -216,6 +238,10 @@ export default function CartScreen({ navigation }) {
     });
     const hasAvailable = availableItems.length > 0;
     const totalAvailablePrice = availableItems.reduce((sum, i) => sum + Number(i.price), 0);
+    const isAllSold = sellerGroup.items.every(i => (i.status || '').toLowerCase() === 'sold');
+    const unavailableLabel = isAllSold
+      ? (t('cart.item_sold_btn') || 'Sudah Terjual')
+      : (t('cart.item_unavailable_btn') || 'Sudah Dipesan');
 
     return (
       <View style={[styles.sellerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -237,7 +263,7 @@ export default function CartScreen({ navigation }) {
             onPress={() => openCheckoutModal(sellerGroup)}
           >
             <CustomText style={[styles.checkoutBtnText, { color: !hasAvailable ? theme.text.placeholder : Colors.common.white }]}>
-              {!hasAvailable ? (t('cart.item_unavailable_btn') || 'Sudah Dipesan') : t('cart.checkout_btn')}
+              {!hasAvailable ? unavailableLabel : t('cart.checkout_btn')}
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -285,7 +311,7 @@ export default function CartScreen({ navigation }) {
                     </CustomText>
                   )}
                   <CustomText style={[styles.itemPrice, { color: isItemUnavailable ? theme.text.placeholder : Colors.primary.yellow500 }]}>
-                    {formatCurrency(cartItem.price)}
+                    {formatCurrency(cartItem.price, locale)}
                   </CustomText>
                 </View>
               </TouchableOpacity>
@@ -307,31 +333,51 @@ export default function CartScreen({ navigation }) {
             {t('cart.total') || 'Total:'}
           </CustomText>
           <CustomText style={{ color: theme.text.primary, fontFamily: 'Barlow-Bold', fontSize: 15 }}>
-            {formatCurrency(totalGroupPrice)}
+            {formatCurrency(totalGroupPrice, locale)}
           </CustomText>
         </View>
       </View>
     );
-  };
+  }, [theme, isDark, openCheckoutModal, handleRemoveItem, locale, t]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Screen Header */}
       <Header title={t('cart.title') || 'Keranjang Belanja'} showBack={false} noBorder={true} />
 
-      {groupedList.length === 0 ? (
-        <EmptyState
-          title={t('cart.empty_title') || 'Keranjang Anda Kosong'}
-          description={t('cart.empty_desc') || 'Belum ada barang yang ditambahkan ke keranjang belanja Anda.'}
-          icon="shopping-cart"
-        />
+      {fetchingCart ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary.blue500} />
+        </View>
       ) : (
         <FlatList
           data={groupedList}
           keyExtractor={(item) => item.sellerId}
           renderItem={renderSellerGroup}
-          contentContainerStyle={styles.listContent}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          contentContainerStyle={[
+            styles.listContent,
+            groupedList.length === 0 && { flexGrow: 1, justifyContent: 'center' }
+          ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[Colors.primary.blue500]}
+              tintColor={Colors.primary.blue500}
+            />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              title={t('cart.empty_title') || 'Keranjang Anda Kosong'}
+              description={t('cart.empty_desc') || 'Belum ada barang yang ditambahkan ke keranjang belanja Anda.'}
+              icon="shopping-cart"
+            />
+          }
         />
       )}
 
@@ -385,7 +431,7 @@ export default function CartScreen({ navigation }) {
                         • {item.title}
                       </CustomText>
                       <CustomText style={{ color: theme.text.secondary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
-                        {formatCurrency(item.price)}
+                        {formatCurrency(item.price, locale)}
                       </CustomText>
                     </View>
                   ))}
@@ -395,7 +441,7 @@ export default function CartScreen({ navigation }) {
                       {t('cart.total') || 'Total:'}
                     </CustomText>
                     <CustomText style={{ color: Colors.primary.yellow500, fontFamily: 'Barlow-Bold', fontSize: 15 }}>
-                      {formatCurrency(selectedItems.reduce((sum, i) => sum + Number(i.price), 0))}
+                      {formatCurrency(selectedItems.reduce((sum, i) => sum + Number(i.price), 0), locale)}
                     </CustomText>
                   </View>
                 </View>

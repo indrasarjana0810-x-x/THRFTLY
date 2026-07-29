@@ -1,7 +1,7 @@
 /* ==========================================
    Root Application Component
 ========================================== */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet, useColorScheme, StatusBar } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -52,11 +52,44 @@ console.error = (...args) => {
 // ----------------------------------------
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    try {
+      const notifGlobal = await AsyncStorage.getItem('notifGlobal');
+      if (notifGlobal === 'false') {
+        return {
+          shouldShowAlert: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      }
+
+      const lang = (await AsyncStorage.getItem('appLanguage')) || 'id';
+      if (lang === 'en') {
+        const content = notification.request.content;
+        const rawTitle = content.title || '';
+        const rawBody = content.body || '';
+        const data = content.data || {};
+
+        if (!data.isTranslatedLocal) {
+          const { triggerLocalNotification } = require('./src/utils/notificationHelper');
+          triggerLocalNotification(rawTitle, rawBody, { ...data, isTranslatedLocal: true });
+          return {
+            shouldShowAlert: false,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          };
+        }
+      }
+    } catch (e) {
+      void 0;
+    }
+
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 const Stack = createNativeStackNavigator();
@@ -87,96 +120,50 @@ function AppContent() {
       }
     }
     setupNotificationChannel();
+  }, []);
 
+  /* ---------- Push Notifications Setup (Sesuai Standar Materi W9 Notification) ---------- */
+  useEffect(() => {
     async function registerForPushNotificationsAsync() {
-      if (Constants.appOwnership === 'expo') {
-        return null;
-      }
+      if (!Device.isDevice) return null;
 
-      let token;
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') return null;
+
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
           name: 'default',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
+          lightColor: '#2563EB',
         });
       }
-  
-      if (Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        
-        // Kita HAPUS requestPermissionsAsync dari sini.
-        // Biar pop-up izin notifikasi (OS default) NGGAK muncul otomatis di background.
-        // Izin HANYA akan diminta lewat Custom Modal di NotificationScreen.js.
 
-        if (finalStatus !== 'granted') {
-          void 0;
-          return;
-        }
-        try {
-          const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-          if (!projectId) {
-            return;
-          }
-
-          token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-          void 0;
-        } catch (e) {
-          // Ignore silently to avoid console spam
-        }
-      } else {
-        void 0;
+      try {
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        return token;
+      } catch (e) {
+        return null;
       }
-      return token;
     }
 
     if (isLoggedIn) {
-      // Tunda 5 detik agar tidak bentrok dengan modal perizinan lokasi di layar awal
-      const timer = setTimeout(() => {
-        registerForPushNotificationsAsync().then(token => {
-          if (token) {
-            api.users.saveToken(token).catch(e => void 0);
-          }
-        });
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoggedIn]);
-
-  /* ---------- Notification Polling for Realtime Local Pop-ups ---------- */
-  useEffect(() => {
-    if (!isLoggedIn) return;
-
-    let lastKnownNotifCount = null;
-
-    const checkNewNotifications = async () => {
-      try {
-        const res = await api.notifications.get();
-        if (res && parseInt(res.status) === 200 && res.data && res.data.notifications) {
-          const list = res.data.notifications;
-          if (list.length > 0) {
-            const latest = list[0];
-            if (lastKnownNotifCount !== null && list.length > lastKnownNotifCount && !latest.isRead) {
-              const notifSetting = await AsyncStorage.getItem('notifGlobal');
-              if (notifSetting !== 'false') {
-                const { triggerLocalNotification } = require('./src/utils/notificationHelper');
-                triggerLocalNotification(latest.title, latest.message, { refId: latest.refId });
-              }
-            }
-            lastKnownNotifCount = list.length;
-          }
+      registerForPushNotificationsAsync().then(token => {
+        if (token) {
+          api.users.saveToken(token).catch(() => void 0);
         }
-      } catch (e) {
-        // Silently ignore network errors during background check
-      }
+      });
+    }
+
+    // Listener saat notifikasi diklik pengguna (Sesuai Materi W9 Slide 83: Handling Notification)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      void data;
+    });
+
+    return () => {
+      responseSubscription.remove();
     };
-
-    checkNewNotifications();
-    const interval = setInterval(checkNewNotifications, 5000);
-
-    return () => clearInterval(interval);
   }, [isLoggedIn]);
 
   /* ---------- Initialization (Cart & Auto Login) ---------- */

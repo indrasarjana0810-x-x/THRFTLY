@@ -1,7 +1,7 @@
 /* ==========================================
    Layar Detail Produk
 ========================================== */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -22,6 +22,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -222,20 +223,25 @@ export default function DetailScreen({ route, navigation }) {
     }
   };
 
-  /* ---------- Derived State ---------- */
-  const isOwner = Boolean(
-    user && item && (
-      user.idUser === item.sellerId ||
-      user.idUser === item.userId ||
-      user.idUser === item.idUser ||
-      user.nim === item.sellerId ||
-      user.email === item.sellerEmail ||
-      user.email === item.email ||
-      user.name === item.sellerName ||
-      user.name === item.userName
-    )
-  );
-  const imagesList = item?.imageUris?.length > 0 ? item.imageUris : [];
+  /* ---------- Derived State (Memoized per W4 Cheat Sheet) ---------- */
+  const isOwner = useMemo(() => {
+    return Boolean(
+      user && item && (
+        user.idUser === item.sellerId ||
+        user.idUser === item.userId ||
+        user.idUser === item.idUser ||
+        user.nim === item.sellerId ||
+        user.email === item.sellerEmail ||
+        user.email === item.email ||
+        user.name === item.sellerName ||
+        user.name === item.userName
+      )
+    );
+  }, [user, item]);
+
+  const imagesList = useMemo(() => {
+    return item?.imageUris?.length > 0 ? item.imageUris : [];
+  }, [item]);
   const imageBg = isDark ? Colors.dark.surface : Colors.light.border;
   const cardBg = isDark ? Colors.dark.background : Colors.common.white;
 
@@ -302,7 +308,7 @@ export default function DetailScreen({ route, navigation }) {
   };
 
   /* ---------- API ---------- */
-  const fetchItemDetail = async () => {
+  const fetchItemDetail = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.items.getById(id);
@@ -318,36 +324,29 @@ export default function DetailScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigation, showToast]);
 
-  useEffect(() => { fetchItemDetail(); }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchItemDetail();
+    }, [fetchItemDetail])
+  );
 
-  if (loading || !item) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
-        <ActivityIndicator size="large" color={Colors.primary.blue500} />
-      </View>
-    );
-  }
-
-
-
-  const getStatusColor = (s) => {
+  const getStatusColor = useCallback((s) => {
     if (s === 'Available') return Colors.semantic.success.main;
     if (s === 'Booked') return Colors.semantic.warning.main;
     if (s === 'Sold') return Colors.semantic.error.main;
     return theme.text.secondary;
-  };
+  }, [theme]);
 
-  const getStatusText = (s) => {
+  const getStatusText = useCallback((s) => {
     if (s === 'Available') return t('status.available') || 'Tersedia';
     if (s === 'Booked') return t('status.booked') || 'Dipesan';
     if (s === 'Sold') return t('status.sold') || 'Terjual';
     return s;
-  };
+  }, [t]);
 
-  const handleContactSeller = () => {
+  const handleContactSeller = useCallback(() => {
     if (!user) {
       showToast(
         t('detail.login_required_contact'), 
@@ -372,10 +371,18 @@ export default function DetailScreen({ route, navigation }) {
       return;
     }
 
-    // Initialize empty meeting note (not prefilled with location)
     setWaMeetingNote('');
     setIsWaModalVisible(true);
-  };
+  }, [user, item, showToast, t]);
+
+  if (loading || !item) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+        <ActivityIndicator size="large" color={Colors.primary.blue500} />
+      </View>
+    );
+  }
 
   const confirmCheckoutAndWA = async () => {
     setIsWaModalVisible(false);
@@ -396,13 +403,13 @@ export default function DetailScreen({ route, navigation }) {
 
         let msg = '';
         if (locale === 'id') {
-          msg = `Halo ${item.sellerName || 'Penjual'},\nSaya tertarik untuk membeli produk berikut di Thriftly:\n\n1. *${item.title}* (${formatCurrency(item.price)})\n\n*Total:* ${formatCurrency(item.price)}`;
+          msg = `Halo ${item.sellerName || 'Penjual'},\nSaya tertarik untuk membeli produk berikut di Thriftly:\n\n1. *${item.title}* (${formatCurrency(item.price, locale)})\n\n*Total:* ${formatCurrency(item.price, locale)}`;
           if (finalNote) {
             msg += `\n*Catatan COD:* ${finalNote}`;
           }
           msg += `\n\nSaya telah membuat pesanan COD di aplikasi Thriftly. Apakah kita bisa janjian waktu & lokasi ketemuan? Terima kasih.`;
         } else {
-          msg = `Hello ${item.sellerName || 'Seller'},\nI am interested in purchasing the following product on Thriftly:\n\n1. *${item.title}* (${formatCurrency(item.price)})\n\n*Total:* ${formatCurrency(item.price)}`;
+          msg = `Hello ${item.sellerName || 'Seller'},\nI am interested in purchasing the following product on Thriftly:\n\n1. *${item.title}* (${formatCurrency(item.price, locale)})\n\n*Total:* ${formatCurrency(item.price, locale)}`;
           if (finalNote) {
             msg += `\n*COD Note:* ${finalNote}`;
           }
@@ -413,11 +420,19 @@ export default function DetailScreen({ route, navigation }) {
           showToast(t('detail.open_wa_err'), 'danger');
         });
       } else {
-        showToast(res?.message || t('common.error'), 'danger');
+        // Jika gagal (misal barang baru saja dipesan user lain)
+        setItem(prev => prev ? { ...prev, status: 'Booked' } : prev);
+        const errMsg = res?.message || (locale === 'id' 
+          ? 'Maaf, barang ini baru saja dipesan oleh pembeli lain beberapa detik lalu.' 
+          : 'Sorry, this item was just booked by another buyer.');
+        showToast(errMsg, 'warning');
       }
     } catch (err) {
-      void 0;
-      showToast(t('auth.server_error'), 'danger');
+      setItem(prev => prev ? { ...prev, status: 'Booked' } : prev);
+      const errMsg = err?.response?.data?.message || err?.message || (locale === 'id' 
+        ? 'Maaf, barang ini baru saja dipesan oleh pembeli lain.' 
+        : 'Sorry, this item was just booked by another buyer.');
+      showToast(errMsg, 'warning');
     } finally {
       setIsCheckingOut(false);
     }
@@ -441,7 +456,7 @@ export default function DetailScreen({ route, navigation }) {
 
   const handleShare = async () => {
     try {
-      const shareMessage = `Hei! Lihat barang keren ini di Thriftly:\n\n*${item.title}*\nHarga: ${formatCurrency(item.price)}\nKondisi: ${item.condition}\nLokasi Pertemuan: ${item.locationName || 'Kampus'}\n\nYuk buka aplikasi Thriftly untuk melihat detailnya!`;
+      const shareMessage = `Hei! Lihat barang keren ini di Thriftly:\n\n*${item.title}*\nHarga: ${formatCurrency(item.price, locale)}\nKondisi: ${item.condition}\nLokasi Pertemuan: ${item.locationName || 'Kampus'}\n\nYuk buka aplikasi Thriftly untuk melihat detailnya!`;
       await Share.share({
         message: shareMessage,
       });
@@ -651,7 +666,7 @@ export default function DetailScreen({ route, navigation }) {
               {item.title}
             </CustomText>
             <CustomText style={[styles.priceTagRight, { color: Colors.primary.blue500 }]}>
-              {formatCurrency(item.price)}
+              {formatCurrency(item.price, locale)}
             </CustomText>
           </View>
 
@@ -1035,24 +1050,45 @@ export default function DetailScreen({ route, navigation }) {
               </Animated.View>
             </TouchableOpacity>
 
-            {/* WA CTA button */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleContactSeller}
-              disabled={isCheckingOut}
-              style={[styles.ctaBtn, { flex: 1, backgroundColor: isCheckingOut ? Colors.semantic.whatsapp + '99' : Colors.semantic.whatsapp }]}
-            >
-              {isCheckingOut ? (
-                <ActivityIndicator size="small" color={Colors.common.white} />
-              ) : (
-                <>
-                  <Ionicons name="logo-whatsapp" size={20} color={Colors.common.white} style={{ marginRight: 8 }} />
-                  <CustomText style={[styles.ctaBtnText, { color: Colors.common.white }]}>
-                    {t('detail.contact_wa') || 'Hubungi via WA'}
-                  </CustomText>
-                </>
-              )}
-            </TouchableOpacity>
+            {/* WA CTA button / Unavailable status button */}
+            {(() => {
+              const itemStatusLower = (item?.status || '').toLowerCase();
+              const isItemSold = itemStatusLower === 'sold';
+              const isItemBooked = itemStatusLower === 'booked';
+              const isItemUnavailable = isItemSold || isItemBooked;
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={isItemUnavailable ? 1 : 0.85}
+                  onPress={handleContactSeller}
+                  disabled={isCheckingOut || isItemUnavailable}
+                  style={[
+                    styles.ctaBtn, 
+                    { 
+                      flex: 1, 
+                      backgroundColor: isItemUnavailable 
+                        ? (isDark ? Colors.dark.surface : Colors.light.border) 
+                        : (isCheckingOut ? Colors.semantic.whatsapp + '99' : Colors.semantic.whatsapp) 
+                    }
+                  ]}
+                >
+                  {isCheckingOut ? (
+                    <ActivityIndicator size="small" color={Colors.common.white} />
+                  ) : isItemUnavailable ? (
+                    <CustomText style={[styles.ctaBtnText, { color: theme.text.placeholder }]}>
+                      {isItemSold ? (t('cart.item_sold_btn') || 'Sudah Terjual') : (t('cart.item_unavailable_btn') || 'Sudah Dipesan')}
+                    </CustomText>
+                  ) : (
+                    <>
+                      <Ionicons name="logo-whatsapp" size={20} color={Colors.common.white} style={{ marginRight: 8 }} />
+                      <CustomText style={[styles.ctaBtnText, { color: Colors.common.white }]}>
+                        {t('detail.contact_wa') || 'Hubungi via WA'}
+                      </CustomText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              );
+            })()}
           </View>
         )}
       </View>
@@ -1121,7 +1157,7 @@ export default function DetailScreen({ route, navigation }) {
                         • {item?.title}
                       </CustomText>
                       <CustomText style={{ color: theme.text.secondary, fontSize: 13, fontFamily: 'Barlow-Bold' }}>
-                        {formatCurrency(item?.price || 0)}
+                        {formatCurrency(item?.price || 0, locale)}
                       </CustomText>
                     </View>
                     <View style={[styles.modalDivider, { backgroundColor: theme.border }]} />
@@ -1130,7 +1166,7 @@ export default function DetailScreen({ route, navigation }) {
                         Total:
                       </CustomText>
                       <CustomText style={{ color: Colors.primary.yellow500, fontFamily: 'Barlow-Bold', fontSize: 15 }}>
-                        {formatCurrency(item?.price || 0)}
+                        {formatCurrency(item?.price || 0, locale)}
                       </CustomText>
                     </View>
                   </View>

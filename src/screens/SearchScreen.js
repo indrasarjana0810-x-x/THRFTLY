@@ -70,10 +70,15 @@ export default function SearchScreen({ navigation, route }) {
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      let location = await Location.getCurrentPositionAsync({});
-      setUserLocation(location.coords);
+      try {
+        let { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          let location = await Location.getCurrentPositionAsync({});
+          setUserLocation(location.coords);
+        }
+      } catch (e) {
+        void 0;
+      }
     })();
   }, []);
   
@@ -201,7 +206,7 @@ export default function SearchScreen({ navigation, route }) {
     loadItems(false, true);
   }, [loadItems]);
 
-  // Debounce search
+  // Debounce search & filter query execution
   useEffect(() => {
     setLoading(true);
     setItems([]);
@@ -211,13 +216,6 @@ export default function SearchScreen({ navigation, route }) {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, selectedCategory, minPrice, maxPrice, selectedCondition]);
-
-  // Auto refresh search results when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadItems(false);
-    }, [selectedCategory, searchQuery, minPrice, maxPrice, selectedCondition])
-  );
 
   const handleSearch = () => {
     Keyboard.dismiss();
@@ -338,6 +336,9 @@ export default function SearchScreen({ navigation, route }) {
         return (
           <ScrollView
             style={{ flex: 1 }}
+            contentContainerStyle={[
+              filteredItems.length === 0 && { flexGrow: 1, justifyContent: 'center' }
+            ]}
             showsVerticalScrollIndicator={false}
             onScroll={({ nativeEvent }) => {
               if (isCloseToBottom(nativeEvent)) {

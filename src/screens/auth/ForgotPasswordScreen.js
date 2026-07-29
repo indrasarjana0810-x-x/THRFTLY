@@ -2,7 +2,7 @@
    Komponen ForgotPassword Screen
 ========================================== */
 /* ---------- Impor ---------- */
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useReducer } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,41 @@ import api from "../../services/api";
 import { useToast } from "../../components/Toast";
 import { useLanguage } from "../../localization/LanguageContext";
 
+/* ==========================================
+   useReducer State Manager
+   Mengelola state form multi-step
+========================================== */
+const initialFormState = {
+  step: 1,
+  nim: "",
+  otpCode: "",
+  newPassword: "",
+  confirmPassword: "",
+  errors: {},
+  loading: false,
+};
+
+function formReducer(state, action) {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return {
+        ...state,
+        [action.field]: action.value,
+        errors: { ...state.errors, [action.field]: null },
+      };
+    case 'SET_ERRORS':
+      return { ...state, errors: action.payload };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'SET_STEP':
+      return { ...state, step: action.payload, loading: false, errors: {} };
+    case 'RESET':
+      return initialFormState;
+    default:
+      return state;
+  }
+}
+
 /**
  * ForgotPasswordScreen
  * Halaman untuk memulihkan kata sandi pengguna.
@@ -37,16 +72,20 @@ import { useLanguage } from "../../localization/LanguageContext";
 export default function ForgotPasswordScreen({ navigation }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
+  
+  // Penggunaan useReducer
+  const [formState, dispatchForm] = useReducer(formReducer, initialFormState);
+  const { step, nim, otpCode, newPassword, confirmPassword, errors, loading } = formState;
+
+  const setStep = (s) => dispatchForm({ type: 'SET_STEP', payload: s });
+  const setLoading = (l) => dispatchForm({ type: 'SET_LOADING', payload: l });
+  const setErrors = (errs) => dispatchForm({ type: 'SET_ERRORS', payload: errs });
+  const setNim = (val) => dispatchForm({ type: 'SET_FIELD', field: 'nim', value: val });
+  const setOtpCode = (val) => dispatchForm({ type: 'SET_FIELD', field: 'otpCode', value: val });
+  const setNewPassword = (val) => dispatchForm({ type: 'SET_FIELD', field: 'newPassword', value: val });
+  const setConfirmPassword = (val) => dispatchForm({ type: 'SET_FIELD', field: 'confirmPassword', value: val });
 
   /* ---------- State & Ref Komponen ---------- */
-  const [nim, setNim] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [errors, setErrors] = useState({});
-
   const otpRef = useRef(null);
   const passwordRef = useRef(null);
   const confirmPasswordRef = useRef(null);
@@ -171,7 +210,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const handleRequestOtp = async () => {
     setErrors({});
     if (!nim.trim()) {
-      setErrors({ nim: "NIM atau Email wajib diisi" });
+      setErrors({ nim: t('auth.nim_email_required') || "NIM atau Email wajib diisi" });
       return;
     }
 
@@ -203,7 +242,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const handleVerifyOtp = async () => {
     setErrors({});
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setErrors({ otpCode: "Masukkan 6 digit kode OTP" });
+      setErrors({ otpCode: t('auth.otp_required') || "Masukkan 6 digit kode OTP" });
       return;
     }
 
@@ -238,13 +277,15 @@ export default function ForgotPasswordScreen({ navigation }) {
     let localErrors = {};
 
     if (!newPassword) {
-      localErrors.newPassword = "Kata sandi baru wajib diisi";
+      localErrors.newPassword = t('auth.toast_new_password_required') || "Kata sandi baru wajib diisi";
     } else if (newPassword.length < 8) {
-      localErrors.newPassword = "Kata sandi minimal 8 karakter";
+      localErrors.newPassword = t('auth.password_min_length') || "Kata sandi minimal 8 karakter";
     }
 
-    if (newPassword !== confirmPassword) {
-      localErrors.confirmPassword = "Konfirmasi kata sandi tidak cocok";
+    if (!confirmPassword) {
+      localErrors.confirmPassword = t('auth.confirm_password_required') || "Konfirmasi kata sandi wajib diisi";
+    } else if (newPassword !== confirmPassword) {
+      localErrors.confirmPassword = t('auth.toast_password_mismatch') || "Konfirmasi kata sandi tidak cocok";
     }
 
     if (Object.keys(localErrors).length > 0) {
@@ -263,7 +304,7 @@ export default function ForgotPasswordScreen({ navigation }) {
       }
     } catch (err) {
       void 0;
-      let errMsg = "Gagal memperbarui kata sandi.";
+      let errMsg = t('auth.toast_password_update_failed') || "Gagal memperbarui kata sandi.";
       if (err.response && err.response.data) {
         errMsg = err.response.data.message || err.response.data.error || errMsg;
       }

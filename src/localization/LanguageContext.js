@@ -2,7 +2,7 @@
    Language Context (Localization)
 ========================================== */
 /* ---------- Impor ---------- */
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import id from './id';
 import en from './en';
@@ -36,13 +36,13 @@ export const LanguageProvider = ({ children }) => {
   }, []);
 
   /* ---------- Fungsi Penanganan Aksi ---------- */
-  const t = (key) => {
+  const t = useCallback((key) => {
     // Return null instead of key so that inline fallbacks (e.g., t('key') || 'Default') work properly
     return translations[locale]?.[key] || null;
-  };
+  }, [locale]);
 
   // Fungsi untuk mengganti bahasa secara instan (Real-time update) dan menyimpannya
-  const switchLanguage = async (lang) => {
+  const switchLanguage = useCallback(async (lang) => {
     if (translations[lang]) {
       setLocale(lang);
       try {
@@ -51,11 +51,13 @@ export const LanguageProvider = ({ children }) => {
         void 0;
       }
     }
-  };
+  }, []);
+
+  const value = useMemo(() => ({ locale, t, switchLanguage }), [locale, t, switchLanguage]);
 
   /* ---------- Tampilan ---------- */
   return (
-    <LanguageContext.Provider value={{ locale, t, switchLanguage }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );

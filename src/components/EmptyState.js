@@ -63,8 +63,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%',
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingVertical: 20,
   },
   iconCircle: {
     width: 120,
@@ -84,6 +86,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   button: {
-    minWidth: 140,
+    minWidth: 160,
   },
 });

@@ -235,7 +235,9 @@ export default function AccountCenterScreen({ navigation }) {
     if (!oldPassword) localErrors.oldPassword = t('auth.password_required') || "Kata sandi saat ini wajib diisi.";
     if (!newPassword) localErrors.newPassword = t('auth.toast_new_password_required') || "Kata sandi baru wajib diisi.";
     else if (newPassword.length < 8) localErrors.newPassword = t('auth.password_min') || "Kata sandi baru minimal 8 karakter.";
-    if (newPassword !== confirmPassword) localErrors.confirmPassword = t('auth.toast_password_mismatch') || "Konfirmasi kata sandi tidak cocok.";
+    
+    if (!confirmPassword) localErrors.confirmPassword = t('auth.confirm_password_required') || "Konfirmasi kata sandi wajib diisi.";
+    else if (newPassword !== confirmPassword) localErrors.confirmPassword = t('auth.toast_password_mismatch') || "Konfirmasi kata sandi tidak cocok.";
 
     if (Object.keys(localErrors).length > 0) {
       setErrors(localErrors);

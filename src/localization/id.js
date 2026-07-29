@@ -84,6 +84,15 @@ export default {
   "auth.remember_password": "Ingat kata sandi Anda?",
   "auth.toast_email_not_found": "NIM atau Email tidak terdaftar!",
   "auth.toast_password_update_failed": "Gagal mengatur ulang kata sandi",
+  "auth.toast_password_updated": "Sandi Diperbarui!",
+  "auth.toast_password_updated_desc": "Kata sandi Anda telah berhasil diubah. Silakan masuk dengan sandi baru Anda.",
+  "auth.continue_login_btn": "Lanjut ke Login",
+  "auth.toast_new_password_required": "Kata sandi baru wajib diisi",
+  "auth.confirm_password_required": "Konfirmasi kata sandi wajib diisi",
+  "auth.toast_password_mismatch": "Konfirmasi kata sandi tidak cocok",
+  "auth.nim_email_required": "NIM atau Email wajib diisi",
+  "auth.otp_required": "Masukkan 6 digit kode OTP",
+  "auth.password_min_length": "Kata sandi minimal 8 karakter",
 
   /* ---------- Auth Umum ---------- */
   "auth.register_now": "Daftar Sekarang",
@@ -95,8 +104,6 @@ export default {
   "auth.login_now": "Masuk Sekarang",
   "auth.password_min_placeholder": "Minimal 8 karakter",
   "auth.toast_server_error": "Gagal menghubungi server backend.",
-  "auth.toast_new_password_required": "Kata sandi baru wajib diisi",
-  "auth.toast_password_mismatch": "Konfirmasi kata sandi tidak cocok",
 
   /* ---------- Study Programs ---------- */
   "prodi.konstruksi_gedung": "Teknologi Konstruksi Bangunan Gedung",
@@ -505,5 +512,6 @@ export default {
   "detail.checksheet_title": "Kondisi Fisik (Check Sheet)",
   "detail.checksheet_failed_count": "Terdapat {count} catatan minus dari penjual",
   "detail.open_wa_err": "Gagal membuka WhatsApp.",
-  "cart.item_unavailable_btn": "Sudah Dipesan"
+  "cart.item_unavailable_btn": "Sudah Dipesan",
+  "cart.item_sold_btn": "Sudah Terjual"
 };

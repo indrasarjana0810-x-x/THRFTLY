@@ -11,7 +11,7 @@ import { NativeModules } from 'react-native';
  */
 // ⚠️ Masukkan URL Cloudflare / Ngrok Tunnel di sini untuk testing beda jaringan (4G/5G/Wi-Fi lain)
 // Kosongkan string '' jika ingin menggunakan IP lokal otomatis kembali.
-const TUNNEL_URL = '';
+const TUNNEL_URL = 'https://accounting-colleges-generator-current.trycloudflare.com/api';
 
 const getBaseUrl = () => {
   if (TUNNEL_URL && TUNNEL_URL.trim() !== '') {

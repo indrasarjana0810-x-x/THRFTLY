@@ -14,10 +14,10 @@ import { Camera } from 'expo-camera'; // Menggunakan module Camera lama atau Cam
  */
 export const requestLocationPermission = async () => {
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.getForegroundPermissionsAsync();
     return status === 'granted';
   } catch (error) {
-    console.error("Gagal meminta izin lokasi:", error);
+    console.error("Gagal memeriksa izin lokasi:", error);
     return false;
   }
 };

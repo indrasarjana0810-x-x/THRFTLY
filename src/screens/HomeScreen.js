@@ -18,6 +18,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
+  LayoutAnimation,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +34,7 @@ import CustomAlert from '../components/CustomAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useLanguage } from '../localization/LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import api from '../services/api';
 
@@ -72,6 +75,7 @@ export default function HomeScreen({ navigation, onLogout }) {
   const [activeSmartFilter, setActiveSmartFilter] = useState('semua');
   const [userLocation, setUserLocation] = useState(null);
   const [locationPermAlertVisible, setLocationPermAlertVisible] = useState(false);
+  const [showSettingsAlertVisible, setShowSettingsAlertVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const loadItems = useCallback(async (isLoadMore = false, isRefreshing = false) => {
@@ -142,7 +146,7 @@ export default function HomeScreen({ navigation, onLogout }) {
         }).catch(err => void 0);
       }
       loadItems(false);
-    }, [user, activeSmartFilter, userLocation])
+    }, [user, loadItems])
   );
 
   useEffect(() => {
@@ -157,8 +161,11 @@ export default function HomeScreen({ navigation, onLogout }) {
             longitude: location.coords.longitude,
           });
         } else {
-          // Menampilkan CustomAlert saat pertama dimuat untuk meminta izin akses lokasi demi akurasi jarak
-          setLocationPermAlertVisible(true);
+          // Menampilkan CustomAlert saat pertama dimuat untuk meminta izin akses lokasi jika belum pernah ditanya
+          const hasAskedLoc = await AsyncStorage.getItem('hasAskedLocPerm');
+          if (!hasAskedLoc) {
+            setLocationPermAlertVisible(true);
+          }
         }
       } catch (error) {
         void 0;
@@ -166,7 +173,7 @@ export default function HomeScreen({ navigation, onLogout }) {
     })();
   }, []); // Hanya dijalankan sekali saat komponen dimuat
 
-  const handleSelectFilter = async (filterId) => {
+  const handleSelectFilter = useCallback(async (filterId) => {
     if (filterId === 'terdekat') {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
@@ -180,7 +187,7 @@ export default function HomeScreen({ navigation, onLogout }) {
           }
           setActiveSmartFilter('terdekat');
         } else {
-          setLocationPermAlertVisible(true);
+          setShowSettingsAlertVisible(true);
         }
       } catch (e) {
         void 0;
@@ -189,10 +196,11 @@ export default function HomeScreen({ navigation, onLogout }) {
     } else {
       setActiveSmartFilter(filterId);
     }
-  };
+  }, [userLocation]);
 
-  const handleConfirmLocationPermission = async () => {
+  const handleConfirmLocationPermission = useCallback(async () => {
     setLocationPermAlertVisible(false);
+    await AsyncStorage.setItem('hasAskedLocPerm', 'true');
     try {
       let { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
@@ -202,23 +210,26 @@ export default function HomeScreen({ navigation, onLogout }) {
           longitude: location.coords.longitude,
         });
       } else {
+        setUserLocation(null);
         if (!canAskAgain) {
-          Alert.alert(
-            t('home.loc_denied_title'),
-            t('home.loc_denied_msg'),
-            [{ text: 'OK' }]
-          );
+          setShowSettingsAlertVisible(true);
         }
       }
     } catch (error) {
-      void 0;
+      setUserLocation(null);
     }
-  };
+  }, []);
 
-  const handleRefresh = () => {
+  const handleDismissLocationPermission = useCallback(async () => {
+    setLocationPermAlertVisible(false);
+    await AsyncStorage.setItem('hasAskedLocPerm', 'true');
+    setUserLocation(null);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadItems(false, true);
-  };
+  }, [loadItems]);
 
   const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }) => {
     const paddingToBottom = 50;
@@ -327,7 +338,10 @@ export default function HomeScreen({ navigation, onLogout }) {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          items.length === 0 && { flexGrow: 1, justifyContent: 'center' }
+        ]}
         showsVerticalScrollIndicator={false}
         onScroll={({ nativeEvent }) => {
           if (isCloseToBottom(nativeEvent)) {
@@ -402,8 +416,25 @@ export default function HomeScreen({ navigation, onLogout }) {
         confirmText={t('common.allow')}
         cancelText={t('common.deny')}
         onConfirm={handleConfirmLocationPermission}
-        onCancel={() => setLocationPermAlertVisible(false)}
-        onClose={() => setLocationPermAlertVisible(false)}
+        onCancel={handleDismissLocationPermission}
+        onClose={handleDismissLocationPermission}
+      />
+
+      {/* --- SETTINGS REQUIRED LOCATION ALERT --- */}
+      <CustomAlert
+        visible={showSettingsAlertVisible}
+        type="warning"
+        title={t('home.loc_denied_title') || 'Akses Lokasi Diperlukan'}
+        message={t('home.loc_denied_msg') || 'Untuk menggunakan fitur lokasi terdekat, silakan izinkan akses lokasi di Pengaturan HP Anda.'}
+        showCancel
+        confirmText={t('common.open_settings') || 'Buka Pengaturan'}
+        cancelText={t('profile.cancel') || 'Batal'}
+        onConfirm={() => {
+          setShowSettingsAlertVisible(false);
+          Linking.openSettings();
+        }}
+        onCancel={() => setShowSettingsAlertVisible(false)}
+        onClose={() => setShowSettingsAlertVisible(false)}
       />
     </SafeAreaView>
   );
@@ -455,22 +486,26 @@ const getStyles = (theme, isDark) => {
     },
     notificationBadge: {
       position: 'absolute',
-      top: 0,
+      top: -2,
       right: -2,
-      minWidth: 16,
-      height: 16,
-      borderRadius: 8,
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
       backgroundColor: Colors.semantic.error.main,
       borderWidth: 1.5,
       borderColor: theme.background,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 4,
+      paddingHorizontal: 3,
     },
     notificationBadgeText: {
       color: Colors.common.white,
       fontSize: 9,
       fontFamily: 'Barlow-Bold',
+      textAlign: 'center',
+      textAlignVertical: 'center',
+      includeFontPadding: false,
+      lineHeight: 12,
     },
     // Hero Carousel Styles Removed
     sectionHeader: {

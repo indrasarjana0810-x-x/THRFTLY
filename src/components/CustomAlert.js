@@ -58,24 +58,11 @@ export default function CustomAlert({
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(scaleValue, {
-          toValue: 0.8,
-          duration: 150, // Faster exit
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityValue, {
-          toValue: 0,
-          duration: 150, // Faster fade out
-          useNativeDriver: true,
-        }),
-      ]).start();
     }
   }, [visible]);
 
-  // Hindari render kalau tidak visible dan animasi sudah selesai
-  if (!visible && opacityValue._value === 0) return null;
+  // unmount modal langsung saat visible false agar tidak menyisakan backdrop overlay di Android
+  if (!visible) return null;
 
   const currentConfig = ALERT_TYPES[type] || ALERT_TYPES.info;
   const displayTitle = title || currentConfig.title;
