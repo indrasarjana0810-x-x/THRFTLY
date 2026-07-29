@@ -4,7 +4,7 @@
 
 export default {
     /* ---------- Login Screen ---------- */
-  "auth.login_failed_credential": "Gagal masuk. NIM/Email atau sandi salah.",
+  "auth.login_failed_credential": "NIM/Email atau Password salah!",
   "auth.login_btn": "Masuk",
   "auth.forgot_password": "Lupa Kata Sandi?",
   "auth.nim_email_required": "NIM atau Email wajib diisi",
@@ -26,6 +26,18 @@ export default {
   "auth.toast_password_updated": "Kata sandi berhasil diperbarui!",
   "auth.toast_password_updated_desc": "Kata sandi Anda telah berhasil diubah. Silakan masuk dengan sandi baru Anda.",
   "auth.register_failed": "Gagal melakukan registrasi",
+  "api.NIM sudah terdaftar": "NIM atau Email sudah terdaftar!",
+  "api.NIM sudah terdaftar!": "NIM atau Email sudah terdaftar!",
+  "api.Email sudah terdaftar": "NIM atau Email sudah terdaftar!",
+  "api.Email sudah terdaftar!": "NIM atau Email sudah terdaftar!",
+  "api.ERR_NIM_EXISTS": "NIM atau Email sudah terdaftar!",
+  "api.ERR_EMAIL_EXISTS": "NIM atau Email sudah terdaftar!",
+  "api.NIM atau Email sudah terdaftar!": "NIM atau Email sudah terdaftar!",
+  "api.ERR_BAD_CREDENTIALS": "NIM/Email atau Password salah!",
+  "api.NIM/Email atau Password salah!": "NIM/Email atau Password salah!",
+  "api.NIM/Email atau password salah": "NIM/Email atau Password salah!",
+  "api.ERR_USER_NOT_FOUND": "NIM atau Email tidak terdaftar!",
+  "api.Pengguna tidak ditemukan": "NIM atau Email tidak terdaftar!",
   "auth.step_account": "Akun",
   "auth.step_profile": "Profil",
   "auth.step_otp": "OTP",
@@ -59,14 +71,18 @@ export default {
   "auth.otp_placeholder": "Masukkan 6 digit kode",
   "auth.send_otp_btn": "Kirim OTP",
   "auth.toast_otp_verify_success": "Verifikasi OTP sukses!",
-  "auth.toast_otp_verify_failed": "Kode OTP salah atau kedaluwarsa",
+  "auth.toast_otp_verify_failed": "Kode OTP salah atau kedaluwarsa!",
+  "api.ERR_INVALID_OTP": "Kode OTP salah atau kedaluwarsa!",
+  "api.ERR_OTP_EXPIRED": "Kode OTP salah atau kedaluwarsa!",
+  "api.OTP tidak valid": "Kode OTP salah atau kedaluwarsa!",
+  "api.OTP sudah kedaluwarsa": "Kode OTP salah atau kedaluwarsa!",
   "auth.cancel_btn": "Batal",
   "auth.nim_email_placeholder2": "Masukkan NIM / Email",
   "auth.confirm_password_placeholder": "Ulangi kata sandi baru",
   "auth.verify_btn": "Verifikasi",
   "auth.update_password_btn": "Perbarui Sandi",
   "auth.remember_password": "Ingat kata sandi Anda?",
-  "auth.toast_email_not_found": "Email/NIM tidak terdaftar",
+  "auth.toast_email_not_found": "NIM atau Email tidak terdaftar!",
   "auth.toast_password_update_failed": "Gagal mengatur ulang kata sandi",
 
   /* ---------- Auth Umum ---------- */
@@ -453,7 +469,8 @@ export default {
   "history.empty_desc": "Riwayat transaksi Anda pada status ini masih kosong.",
   "history.seller_label": "Penjual:",
   "history.buyer_label": "Pembeli:",
-  "history.total_label": "Total:",
+  "cart.total": "Total Harga:",
+  "history.total_label": "Total Harga:",
   "history.btn_cancel": "Batalkan",
   "history.btn_reject": "Tolak",
   "history.btn_accept": "Terima",
@@ -487,5 +504,6 @@ export default {
   "detail.not_available": "Barang ini sudah tidak tersedia untuk dipesan.",
   "detail.checksheet_title": "Kondisi Fisik (Check Sheet)",
   "detail.checksheet_failed_count": "Terdapat {count} catatan minus dari penjual",
-  "detail.open_wa_err": "Gagal membuka WhatsApp."
+  "detail.open_wa_err": "Gagal membuka WhatsApp.",
+  "cart.item_unavailable_btn": "Sudah Dipesan"
 };

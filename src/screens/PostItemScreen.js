@@ -408,10 +408,10 @@ export default function PostItemScreen({ navigation, route }) {
   const [isImageModalVisible, setImageModalVisible] = useState(false);
   const [cameraPermDeniedVisible, setCameraPermDeniedVisible] = useState(false);
   const [galleryPermDeniedVisible, setGalleryPermDeniedVisible] = useState(false);
+  const [isCameraPermReqAlertVisible, setCameraPermReqAlertVisible] = useState(false);
+  const [isGalleryPermReqAlertVisible, setGalleryPermReqAlertVisible] = useState(false);
   const [isLocationPermAlertVisible, setLocationPermAlertVisible] = useState(false);
   const [spotModalVisible, setSpotModalVisible] = useState(false);
-  const [selectedSpotName, setSelectedSpotName] = useState('');
-
   const campusPresetSpots = useMemo(() => {
     const spots = BASE_CAMPUS_SPOTS.map(s => ({
       id: s.id,
@@ -452,54 +452,65 @@ export default function PostItemScreen({ navigation, route }) {
     setImageModalVisible(true);
   };
 
+  const executeCameraPick = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        setCameraPermDeniedVisible(true);
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUris(prev => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      showToast('Gagal memproses kamera.', 'danger');
+    }
+  };
+
+  const executeGalleryPick = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setGalleryPermDeniedVisible(true);
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUris(prev => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      showToast('Gagal memproses galeri.', 'danger');
+    }
+  };
+
   const executeImagePick = async (source) => {
     setImageModalVisible(false);
     try {
-      let result;
       if (source === 'kamera') {
-        // Cek status izin kamera SEBELUM request agar system dialog tidak muncul jika sudah pernah ditentukan
-        const { status: currentStatus } = await ImagePicker.getCameraPermissionsAsync();
-        let finalStatus = currentStatus;
-        if (currentStatus === 'undetermined') {
-          // Belum pernah diminta → trigger system dialog 1x (wajar)
-          const { status: requested } = await ImagePicker.requestCameraPermissionsAsync();
-          finalStatus = requested;
+        const { status } = await ImagePicker.getCameraPermissionsAsync();
+        if (status === 'granted') {
+          executeCameraPick();
+        } else {
+          setCameraPermReqAlertVisible(true);
         }
-        if (finalStatus === 'denied' || finalStatus !== 'granted') {
-          // Sudah ditolak → arahkan ke Settings lewat custom modal, TIDAK trigger system dialog lagi
-          showCameraPermDeniedAlert();
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.7,
-        });
       } else {
-        // Cek status izin galeri SEBELUM request
-        const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
-        let finalStatus = currentStatus;
-        if (currentStatus === 'undetermined') {
-          const { status: requested } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          finalStatus = requested;
+        const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
+        if (status === 'granted') {
+          executeGalleryPick();
+        } else {
+          setGalleryPermReqAlertVisible(true);
         }
-        if (finalStatus === 'denied' || finalStatus !== 'granted') {
-          showGalleryPermDeniedAlert();
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.7,
-        });
-      }
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const fileUri = result.assets[0].uri;
-        setImageUris(prev => [...prev, fileUri]);
       }
     } catch (error) {
-      void 0;
       showToast('Gagal memproses gambar.', 'danger');
     }
   };
@@ -527,9 +538,14 @@ export default function PostItemScreen({ navigation, route }) {
   };
 
   const handlePostItem = async () => {
-    if (!title || !price || !category || !description || !location || imageUris.length === 0) {
+    if (!title || !price || !category || !description || !location || !latitude || !longitude || imageUris.length === 0) {
       setShowValidation(true);
-      showToast("Nama barang, Harga, Kategori, Deskripsi, Lokasi, dan minimal 1 Foto wajib diisi!", "danger");
+      showToast("Nama barang, Harga, Kategori, Deskripsi, Patokan Lokasi, Spot Lokasi COD Kampus, dan minimal 1 Foto wajib diisi!", "danger");
+      if (!location || !latitude || !longitude || imageUris.length === 0) {
+        setActiveTab('media');
+      } else {
+        setActiveTab('detail');
+      }
       return;
     }
     // Validasi: check sheet wajib diisi jika kategori punya template
@@ -1172,9 +1188,14 @@ export default function PostItemScreen({ navigation, route }) {
 
               {/* ---------- Spot Location Field (Preset Kampus & GPS) ---------- */}
               <View style={{ marginBottom: 16, width: "100%" }}>
-                <CustomText style={{ fontFamily: "Barlow-Bold", fontSize: 12, marginBottom: 6, color: theme.text.secondary }}>
-                  {t('postitem.map_coord_label') || 'Spot Titik Pertemuan COD Kampus'}
-                </CustomText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <CustomText style={{ fontFamily: "Barlow-Bold", fontSize: 12, color: theme.text.secondary }}>
+                    {t('postitem.map_coord_label') || 'Spot Titik Pertemuan COD Kampus'}
+                  </CustomText>
+                  <CustomText style={{ color: Colors.semantic.error.main, fontFamily: 'Barlow-Bold', fontSize: 12, marginLeft: 4 }}>
+                    *
+                  </CustomText>
+                </View>
 
                 <TouchableOpacity
                   activeOpacity={0.8}
@@ -1184,7 +1205,11 @@ export default function PostItemScreen({ navigation, route }) {
                     alignItems: "center",
                     borderRadius: 12,
                     borderWidth: 1.5,
-                    borderColor: (latitude && longitude) ? Colors.semantic.success.main : theme.border,
+                    borderColor: (showValidation && (!latitude || !longitude)) 
+                      ? Colors.semantic.error.main 
+                      : (latitude && longitude) 
+                        ? Colors.semantic.success.main 
+                        : theme.border,
                     backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
                     paddingHorizontal: 14,
                     minHeight: 48,
@@ -1198,7 +1223,7 @@ export default function PostItemScreen({ navigation, route }) {
                       <Ionicons
                         name={latitude && longitude ? "map" : "map-outline"}
                         size={18}
-                        color={latitude && longitude ? Colors.semantic.success.main : theme.text.secondary}
+                        color={(showValidation && (!latitude || !longitude)) ? Colors.semantic.error.main : (latitude && longitude ? Colors.semantic.success.main : theme.text.secondary)}
                       />
                     )}
                   </View>
@@ -1207,7 +1232,7 @@ export default function PostItemScreen({ navigation, route }) {
                     type="body"
                     style={{
                       flex: 1,
-                      color: (latitude && longitude) ? Colors.semantic.success.main : theme.text.placeholder,
+                      color: (showValidation && (!latitude || !longitude)) ? Colors.semantic.error.main : ((latitude && longitude) ? Colors.semantic.success.main : theme.text.placeholder),
                       fontFamily: (latitude && longitude) ? "Barlow-Bold" : "Barlow-Medium",
                       fontSize: 13
                     }}
@@ -1227,6 +1252,12 @@ export default function PostItemScreen({ navigation, route }) {
                     <Ionicons name="chevron-forward" size={18} color={theme.text.secondary} />
                   )}
                 </TouchableOpacity>
+
+                {showValidation && (!latitude || !longitude) && (
+                  <CustomText type="caption" style={{ color: Colors.semantic.error.main, marginTop: 4, marginLeft: 4 }}>
+                    {t('common.required') || 'Wajib diisi'}
+                  </CustomText>
+                )}
               </View>
             </Panel>
           </View>
@@ -1348,6 +1379,40 @@ export default function PostItemScreen({ navigation, route }) {
         }}
         onCancel={() => setGalleryPermDeniedVisible(false)}
         onClose={() => setGalleryPermDeniedVisible(false)}
+      />
+
+      {/* ---------- Modal Minta Izin Kamera (Custom Alert) ---------- */}
+      <CustomAlert
+        visible={isCameraPermReqAlertVisible}
+        type="info"
+        title="Izin Akses Kamera"
+        message="Aplikasi THRIFTLY memerlukan izin akses kamera kamu untuk mengambil foto barang thrift. Lanjutkan?"
+        showCancel
+        confirmText="Izinkan"
+        cancelText="Tolak"
+        onConfirm={() => {
+          setCameraPermReqAlertVisible(false);
+          setTimeout(executeCameraPick, 300);
+        }}
+        onCancel={() => setCameraPermReqAlertVisible(false)}
+        onClose={() => setCameraPermReqAlertVisible(false)}
+      />
+
+      {/* ---------- Modal Minta Izin Galeri (Custom Alert) ---------- */}
+      <CustomAlert
+        visible={isGalleryPermReqAlertVisible}
+        type="info"
+        title="Izin Akses Galeri"
+        message="Aplikasi THRIFTLY memerlukan izin akses galeri foto kamu untuk memilih foto barang thrift. Lanjutkan?"
+        showCancel
+        confirmText="Izinkan"
+        cancelText="Tolak"
+        onConfirm={() => {
+          setGalleryPermReqAlertVisible(false);
+          setTimeout(executeGalleryPick, 300);
+        }}
+        onCancel={() => setGalleryPermReqAlertVisible(false)}
+        onClose={() => setGalleryPermReqAlertVisible(false)}
       />
 
       {/* ---------- Modal Izin Lokasi ---------- */}
