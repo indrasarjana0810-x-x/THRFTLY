@@ -267,6 +267,7 @@ export default {
   "postitem.select_spot_modal_title": "Select COD Meeting Spot",
   "postitem.spot_set_toast": "COD spot set to:",
   "postitem.spot_verified": "Verified Campus Spot",
+  "postitem.gps_verified": "Verified Campus Spot",
   "postitem.title": "Add Item",
   "postitem.upload_desc": "Choose image from gallery or camera.\nJPG, JPEG, PNG. Max 5 MB.",
   "postitem.upload_photo": "Upload Photo",

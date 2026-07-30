@@ -431,6 +431,7 @@ export default function PostItemScreen({ navigation, route }) {
   const handleSelectSpot = (spot) => {
     setSpotModalVisible(false);
     if (spot.isGps) {
+      setLocation(''); // Clear location name — user must type manually
       handleFetchLocation();
     } else {
       setLatitude(spot.lat);
@@ -677,17 +678,16 @@ export default function PostItemScreen({ navigation, route }) {
         showToast(t('postitem.err_out_of_bounds') || "Lokasi serah terima barang harus berada di dalam area kampus Politeknik Astra.", "danger");
         setLatitude(null);
         setLongitude(null);
-        setLocation('');
       } else {
         setLatitude(lat);
         setLongitude(lng);
-        setLocation("Kampus Politeknik Astra");
+        setSelectedSpotName(t('postitem.gps_verified') || 'GPS Terverifikasi');
         showToast(t('postitem.toast_location_success') || "Lokasi serah terima berhasil dipasang!", "success");
       }
     } catch (e) {
       setLatitude(-6.3475);
       setLongitude(107.1486);
-      setLocation("Kampus Politeknik Astra");
+      setSelectedSpotName(t('postitem.gps_verified') || 'GPS Terverifikasi');
       showToast(t('postitem.toast_location_success') || "Lokasi serah terima berhasil dipasang!", "success");
     } finally {
       setIsFetchingLocation(false);

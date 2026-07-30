@@ -18,9 +18,9 @@ const Tab = createBottomTabNavigator();
  */
 export default function MainTabNavigator() {
   return (
-    <Tab.Navigator 
+    <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ 
+      screenOptions={{
         headerShown: false,
       }}
     >

@@ -3,7 +3,7 @@
 ========================================== */
 
 export default {
-    /* ---------- Login Screen ---------- */
+  /* ---------- Login Screen ---------- */
   "auth.login_failed_credential": "NIM/Email atau Password salah!",
   "auth.login_btn": "Masuk",
   "auth.forgot_password": "Lupa Kata Sandi?",
@@ -255,6 +255,7 @@ export default {
   "postitem.select_spot_modal_title": "Pilih Spot Pertemuan COD",
   "postitem.spot_set_toast": "Spot COD berhasil ditetapkan:",
   "postitem.spot_verified": "Spot Kampus Terverifikasi",
+  "postitem.gps_verified": "Spot Kampus Terverifikasi",
   "postitem.title": "Tambah Barang",
   "postitem.upload_desc": "Pilih gambar dari galeri atau kamera.\nJPG, JPEG, PNG. Maks. 5 MB.",
   "postitem.upload_photo": "Unggah Foto",

@@ -332,7 +332,7 @@ export default function SearchScreen({ navigation, route }) {
       {/* Main Content */}
       {renderHeader()}
       {(() => {
-        const filteredItems = items.filter(item => !user || (item.sellerId !== user.idUser && item.sellerId !== user.nim));
+        const filteredItems = items.filter(item => !user || item.sellerId !== user.idUser);
         return (
           <ScrollView
             style={{ flex: 1 }}

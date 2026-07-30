@@ -126,7 +126,6 @@ export default function LoginScreen({ navigation }) {
           if (parseInt(profileResponse.status) === 200 && profileResponse.data) {
             const profileData = profileResponse.data;
             userProfile = {
-              nim: profileData.idUser,
               idUser: profileData.idUser,
               name: profileData.name,
               email: profileData.email,

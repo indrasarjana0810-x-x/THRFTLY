@@ -230,7 +230,6 @@ export default function DetailScreen({ route, navigation }) {
         user.idUser === item.sellerId ||
         user.idUser === item.userId ||
         user.idUser === item.idUser ||
-        user.nim === item.sellerId ||
         user.email === item.sellerEmail ||
         user.email === item.email ||
         user.name === item.sellerName ||
